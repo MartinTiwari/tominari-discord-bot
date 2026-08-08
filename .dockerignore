@@ -1,0 +1,23 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+
+# Secrets belong in the host's environment variables, never in the image.
+.env
+
+# Local state — the container gets a fresh volume.
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+logs
+*.log
+
+# Windows-only supervision, irrelevant in a container.
+scripts/run-forever.ps1
+
+# Docs and planning notes.
+*.md
+tominari_design.md
+tominari_nepali_quotes.json

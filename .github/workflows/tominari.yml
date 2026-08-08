@@ -1,0 +1,91 @@
+name: Tominari
+
+# Posts Nepal news, sports and churot-free reminders to Discord on a schedule,
+# with no server to keep alive. This replaces the long-lived bot process, so
+# slash commands do NOT work from here — only the scheduled posts.
+#
+# GitHub cron is UTC and Kathmandu is UTC+05:45, hence the :15 offsets:
+#   00:15 UTC = 06:00 NPT   (morning brief)
+#   03:15 UTC = 09:00 NPT   (sports, morning)
+#   13:15 UTC = 19:00 NPT   (sports, evening)
+#   16:15 UTC = 22:00 NPT   (evening recap)
+# The half-hourly jobs are timezone-independent. Quiet hours for reminders are
+# enforced in code against Asia/Kathmandu, so the runner's clock does not matter.
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'   # social feed + churot-free blast
+    - cron: '15 0 * * *'     # morning brief
+    - cron: '15 16 * * *'    # evening recap
+    - cron: '15 3,13 * * *'  # sports pulse
+  workflow_dispatch:         # lets you fire a run by hand from the Actions tab
+    inputs:
+      jobs:
+        description: 'Space-separated: feed brief recap sports health'
+        required: false
+        default: 'feed health'
+
+# Runs share one SQLite cache, so never let two overlap.
+concurrency:
+  group: tominari-post
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # Dedupe state lives in SQLite. Without restoring it, every run would
+      # treat the same articles as new and re-post them.
+      - name: Restore database
+        id: db
+        uses: actions/cache/restore@v4
+        with:
+          path: data/tominari.db
+          key: tominari-db-
+          restore-keys: tominari-db-
+
+      - run: npm ci --omit=optional
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+
+      # Pick the job set from which cron fired, or from the manual input.
+      - name: Decide what to post
+        id: which
+        run: |
+          if [ -n "${{ github.event.inputs.jobs }}" ]; then
+            echo "jobs=${{ github.event.inputs.jobs }}" >> "$GITHUB_OUTPUT"
+          else
+            case "${{ github.event.schedule }}" in
+              '15 0 * * *')    echo "jobs=brief"       >> "$GITHUB_OUTPUT" ;;
+              '15 16 * * *')   echo "jobs=recap"       >> "$GITHUB_OUTPUT" ;;
+              '15 3,13 * * *') echo "jobs=sports"      >> "$GITHUB_OUTPUT" ;;
+              *)               echo "jobs=feed health" >> "$GITHUB_OUTPUT" ;;
+            esac
+          fi
+
+      - name: Post to Discord
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
+          SPORTS_API_KEY: ${{ secrets.SPORTS_API_KEY }}
+          DB_PATH: data/tominari.db
+          LOG_LEVEL: info
+        run: node scripts/postnow.js ${{ steps.which.outputs.jobs }}
+
+      # Cache entries are immutable, so save under a fresh key each run; the
+      # restore-keys prefix above always picks up the newest one.
+      - name: Save database
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data/tominari.db
+          key: tominari-db-${{ github.run_id }}-${{ github.run_attempt }}

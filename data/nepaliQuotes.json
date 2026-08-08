@@ -1,0 +1,121 @@
+{
+"tikhoQuotes": [
+"Yo churot nakhaa, muji! Tero shakti dekhau!",
+"Oe mula! {days} din bhaisakyo! Aba feri churot khanchhas?",
+"Gadha haina ni ta! Churot nakhaa, jatha!",
+"Muji, ek din pani waste nagar! Churot nakhaa, agadi badh!",
+"Oe churot feri samatis? Khatam gar tyo!",
+"Yo muji churot ko pachhadi nalag! Tero control ma bas!",
+"Oe jatha! Churot nakhaa hai! Taile sakchhas!",
+"Muji, {days} din samma rokis! Aba ek ota churot le sabai bigarna nadey!",
+"Churot khanu bhaneko afnai khutta ma bancharo hannu ho, gadha nabana!",
+"Yo churot le kehi didaina, muji! Chhodera agadi badh!",
+"Oe mula! Tero willpower kaha gayo? Churot nakhaa!",
+"Ta sakchhas ni, muji! Euta churot ko lagi haar namana!",
+"Muji, bahana banauna chhod! Churot nakhaa!",
+"Oe jatha, {days} din samma rokis! Aba pani control ma basa!",
+"Gadha jasto churot ko pachhadi nalag! Taile afulai control gar!",
+"Oe muji! Euta cigarette ko lagi {days} din ko mehenat nafasal!",
+"Yo muji yo! Shakti dekhau! Churot lai haina, afulai jitau!",
+"Churot khana man lagyo? Hawa kura! Ali ber rok, craving jancha!",
+"Oe mula! Tero body lai churot chahiyeko haina, dimag le matra jhyau gareko ho!",
+"Yoga garna sakchhas, gym garna sakchhas, churot nakhana sakdaina? Sakchhas, muji!",
+"Oe jatha, {days} din bhaisakyo! Aba kina feri suru garne?",
+"Gadha haina ni ta! Churot nakhaa, afno goal samjha!",
+"Yo churot ta tero lagi kehi pani haina! Tyeslai side laga!",
+"Oe muji, aaja pani jit! Bholi ko kura bholi heramla!",
+"Churot = weakness. Tero kaam chai strong basne ho!",
+"Churot nakhaa, muji! Tero control ma taile nai basnu parcha!",
+"{days} din samma strong bhais! Aba ek puff le sabai bigarna nadey!",
+"Gadha jasto 'euta matra' bhandai nasur! Euta bata feri sabai suru huncha!",
+"Oe mula! Churot le timilai control garne ki timile churot lai?",
+"Muji, shakti dekhau! Craving lai hara!",
+"Yo churot nakhaa na, jatha! Taile yo bhanda dherai garna sakchhas!",
+"Bahana banauna chhod! Churot ta nakhaa!",
+"{days} din ko mehenat lai euta cigarette ma nasakau!",
+"Oe muji! Ta gadha haina! Control ma basa, churot nakhaa!",
+"{days} din ko struggle cha, muji! Euta cigarette ko lagi sabai waste nagar!",
+"Gadha haina ni ta! Strong bas, churot bata tada basa!",
+"Yo muji craving aayo bhandai churot nakhaa! Ali ber parkh!",
+"Oe mula, churot ko satta coffee kha, walk jaa, kei gara!",
+"Jatha! Tero goal thulo cha. Euta churot le tyo goal nafasal!",
+"Churot nakhaa, muji! Taile sakchhas, kura sakiyo!",
+"{days} din samma rokis! Aba aaja ko din pani jit!",
+"Oe muji, tension aayo bhandai churot tira najau! Hawa kha, walk jaa!",
+"Gym jaa, sathi sanga guff gara, game khela—churot chai nakhaa!",
+"Yo churot weak mindset ko shortcut ho! Ta shortcut khojne manche haina!",
+"Oe mula! Aaja ko craving lai hara! Bholi afulai dhanyabad dinchhas!",
+"Cigarette khayera hero hune haina, chhodera hero hune ho, muji!"
+],
+
+"softQuotes": [
+"Timi sakchhau! {days} din dekhi strong chhau. Yestai agadi badha! 💪",
+"Churot nakhaa, sathi. Timi ramro gardai chhau!",
+"Aaja ko din pani jitne ho! Timi sakchhau! 🔥",
+"{days} din bina churot — yo sano kura haina! Proud of you!",
+"Strong basa, bro. Ek din ekchoti gardai agadi badha!",
+"Churot ko jarurat chaina. Timi afai strong chhau! 💯",
+"{days} din pugisakyo! Aba rokine haina, agadi badhne!",
+"Ramrari gardai chhau! Churot lai bye-bye gara!",
+"Ek din ekchoti. Craving aaucha, jancha. Timi chai tikirakha! 💪",
+"Ramro decision, ramro life! Churot nakhaa! 🔥"
+],
+
+"badgeMessages": {
+"7": "🏅 ७ दिनको च्याम्पियन! (One Week Champion!)",
+"30": "🏆 १ महिनाको योद्धा! (One Month Warrior!)",
+"60": "👑 २ महिनाको राजा! (Two Months Strong!)",
+"90": "💎 ३ महिनाको डायमण्ड! (Three Months Legend!)",
+"365": "🌟 १ वर्षको लेजेन्ड! (One Year Legend!)"
+},
+
+"encouragementPhrases": {
+"morning": "आजको दिन पनि बलियो भएर सुरु गर! चुरोट चाहिँ नखाऊ! 🌅",
+"afternoon": "दिउँसो अलि गाह्रो भयो? केही बेर हिँड, पानी खाऊ, चुरोट नखाऊ! ☀️",
+"evening": "आजको दिन लगभग जितिसक्यौ! अब चुरोटको लोभमा नपर! 🌙",
+"night": "आज पनि जितिस्! आराम गर, राम्रोसँग सुत। चुरोट नखाऊ! 🌙",
+"after_meal": "खाना खाइसक्यौ? अब चुरोट चाहिँ पर्दैन! केही बेर हिँड! 🍽️",
+"stress": "तनाव भयो? चुरोटतिर नजाऊ! बाहिर निस्क, हिँड, गहिरो सास ले! 💪",
+"social": "साथीसँग रमाइलो गर, गफ गर—चुरोट बिना पनि मज्जा आउँछ!",
+"workout": "जिम जा, पसिना निकाल! शक्ति देखाऊ! चुरोटलाई होइन, शरीरलाई प्राथमिकता दे! 💪",
+"before_sleep": "आज पनि बलियो रहिस्। अब आराम गर, भोलि फेरि जित्ने हो! 😴"
+},
+
+"streakMilestones": {
+"1": "🚀 १ दिन पूरा! सुरुवात भइसक्यो—अब रोकिँदैन!",
+"3": "🔥 ३ दिन पूरा! लय समातिसक्यौ!",
+"7": "🏅 १ हप्ता पूरा! अब त च्याम्पियन नै भयौ!",
+"14": "⭐ २ हप्ता पूरा! अब कुरा गम्भीर छ!",
+"30": "🏆 १ महिना पूरा! लेजेन्ड स्टाटस!",
+"60": "👑 २ महिना पूरा! अब त रोक्न गाह्रो छ!",
+"90": "💎 ३ महिना पूरा! तिमीले साँच्चै जित्दैछौ!",
+"180": "🌟 ६ महिना पूरा! आधा वर्ष चुरोट बिना!",
+"365": "👑 १ वर्ष पूरा! एकदमै ठूलो उपलब्धि!"
+},
+
+"failurePrevention": [
+"एउटा cigarette = फेरि पुरानै चक्र सुरु हुन सक्छ। {days} दिनको mehenat nasakau, muji!",
+"छोडिसकेपछि फेरि सुरु नगर! {days} दिनसम्म जे गरिस्, त्यसको मूल्य बुझ!",
+"तनाव आयो? Walk जा, साथीलाई फोन गर, music सुन—चुरोट चाहिँ नखाऊ!",
+"Craving आयो? केही बेर पर्ख! पानी खाऊ, हिँड, ध्यान अर्कोतिर लगाऊ!",
+"‘एउटा मात्र हो’ भनेर आफूलाई नझुक्याऊ! {days} दिनदेखि strong छौ!",
+"Party मा अरूले चुरोट खाए भन्दैमा तिमीले पनि खानुपर्दैन! आफ्नो control मा बस!",
+"One puff भनेर सुरु गरेर फेरि पुरानै बानीमा नफर्क! तिमी योभन्दा strong छौ!",
+"चुरोट खाने इच्छा आयो? १० मिनेट पर्ख। इच्छा घट्छ। तुरुन्त decision नलेऊ!",
+"मुजी, craving आयो भन्दै हार नमान! यो केही बेरको कुरा हो!",
+"एउटा cigarette को लागि आफ्नो streak नबिगार! तिमी यहाँसम्म आइपुगेका छौ!"
+],
+
+"motivationalStories": [
+"Taile {days} din samma churot chhoyenas! Suru ma impossible jasto lagthyo, tara her ta—taile garis!",
+"Aafailai ekchoti bhana: 'Muji, maile sakisake! Aba feri churot chhuna pardaina!'",
+"Bayern Munich jasto focus gara—goal ekdam clear! Churot lai side laga!",
+"Fitness goal jastai yo pani goal ho. Din-dinai progress gara, ekai choti sabai perfect huna pardaina!",
+"Taile already prove garis—timi weak chainau! Aaja pani afno control ma basa!",
+"Craving aunu failure haina. Craving aayera pani churot nakhanu chai real win ho!",
+"Aaja churot nakhayera sutne ho. Bholi feri naya din, naya win!",
+"Timi le churot chhodeko ho, churot le timilai chhodeko haina. Control timro haat ma cha!",
+"Jati din badhcha, teti nai purano baani kamjor hudai jancha. Rokera rakha!",
+"Euta din, euta craving, euta win. Yestai gardai streak lamo bana!"
+]
+}

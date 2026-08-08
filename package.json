@@ -1,0 +1,30 @@
+{
+  "name": "tominari",
+  "version": "1.0.0",
+  "description": "Tominari — Nepal news, sports tracking and tikho anti-smoking reminders for Discord",
+  "main": "bot.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node bot.js",
+    "deploy": "node deploy-commands.js",
+    "dev": "node --watch bot.js",
+    "selftest": "node scripts/selftest.js",
+    "dryrun": "node scripts/dryrun.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "cheerio": "^1.0.0",
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.5",
+    "node-cron": "^3.0.3",
+    "rss-parser": "^3.13.0",
+    "undici": "^6.19.8"
+  },
+  "optionalDependencies": {
+    "puppeteer": "^23.4.0"
+  },
+  "license": "MIT"
+}

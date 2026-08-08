@@ -1,0 +1,103 @@
+{
+  "_comment": "Keyword weights drive utils/categoryClassifier.js. `urlHints` match against the article URL path, which is usually a stronger signal than the headline. `nepali` holds Devanagari terms — over half the tracked feeds publish in Nepali, and English keywords never match those headlines.",
+  "categories": {
+    "politics": {
+      "emoji": "📰",
+      "label": "Politics",
+      "urlHints": ["/politics", "/national", "/rajniti", "/government"],
+      "keywords": [
+        "parliament", "minister", "prime minister", "government", "election", "party",
+        "congress", "uml", "maoist", "president", "cabinet", "constitution", "mp",
+        "ordinance", "coalition", "opposition", "policy", "supreme court", "corruption",
+        "nepal government", "protest", "bandh", "municipality", "ward"
+      ],
+      "nepali": [
+        "प्रधानमन्त्री", "मन्त्री", "संसद", "सरकार", "निर्वाचन", "पार्टी", "कांग्रेस",
+        "एमाले", "माओवादी", "राष्ट्रपति", "मन्त्रिपरिषद", "संविधान", "सांसद",
+        "अध्यादेश", "गठबन्धन", "प्रतिपक्ष", "सर्वोच्च", "भ्रष्टाचार", "आन्दोलन",
+        "बन्द", "नगरपालिका", "वडा", "राजनीति", "अदालत", "प्रहरी", "गिरफ्तार"
+      ]
+    },
+    "business": {
+      "emoji": "💼",
+      "label": "Business",
+      "urlHints": ["/money", "/business", "/economy", "/market", "/bank"],
+      "keywords": [
+        "economy", "bank", "rastra bank", "inflation", "revenue", "budget", "gdp",
+        "export", "import", "trade", "stock", "nepse", "share market", "investment",
+        "tourism revenue", "remittance", "industry", "startup funding", "loan",
+        "interest rate", "tax", "customs", "ipo", "insurance"
+      ],
+      "nepali": [
+        "अर्थतन्त्र", "बैंक", "राष्ट्र बैंक", "मुद्रास्फीति", "राजस्व", "बजेट",
+        "निर्यात", "आयात", "व्यापार", "सेयर", "नेप्से", "लगानी", "रेमिट्यान्स",
+        "उद्योग", "ऋण", "ब्याज", "कर", "भन्सार", "बीमा", "व्यवसाय", "अर्थ",
+        "मूल्य", "बजार", "पर्यटन"
+      ]
+    },
+    "sports": {
+      "emoji": "🏆",
+      "label": "Sports",
+      "urlHints": ["/sports", "/khelkud", "/cricket", "/football"],
+      "keywords": [
+        "cricket", "football", "match", "tournament", "league", "goal", "wicket",
+        "anfa", "sandeep lamichhane", "rohit paudel", "world cup", "olympic",
+        "bayern", "barcelona", "real madrid", "premier league", "champions league",
+        "player", "coach", "score", "medal", "athlete", "marathon", "volleyball"
+      ],
+      "nepali": [
+        "क्रिकेट", "फुटबल", "खेल", "खेलकुद", "प्रतियोगिता", "लिग", "गोल",
+        "विकेट", "विश्वकप", "ओलम्पिक", "खेलाडी", "प्रशिक्षक", "पदक",
+        "म्याच", "टोली", "भलिबल", "दौड"
+      ]
+    },
+    "tech": {
+      "emoji": "💻",
+      "label": "Technology",
+      "urlHints": ["/technology", "/tech", "/science", "/digital"],
+      "keywords": [
+        "technology", "software", "app", "startup", "internet", "ntc", "ncell",
+        "digital", "ai", "artificial intelligence", "cyber", "data", "smartphone",
+        "5g", "fintech", "e-commerce", "esewa", "khalti", "coding", "science",
+        "satellite", "space", "research", "innovation", "telecom"
+      ],
+      "nepali": [
+        "प्रविधि", "सफ्टवेयर", "एप", "इन्टरनेट", "डिजिटल", "मोबाइल",
+        "प्रयोगशाला", "अनुसन्धान", "विज्ञान", "दूरसञ्चार", "साइबर",
+        "स्मार्टफोन", "कम्प्युटर", "स्टार्टअप"
+      ]
+    },
+    "entertainment": {
+      "emoji": "🎬",
+      "label": "Entertainment",
+      "urlHints": ["/entertainment", "/art", "/culture", "/lifestyle", "/movies"],
+      "keywords": [
+        "movie", "film", "actor", "actress", "singer", "song", "music", "album",
+        "kollywood", "bollywood", "concert", "festival", "dashain", "tihar",
+        "celebrity", "drama", "series", "art", "theatre", "fashion", "culture",
+        "trailer", "box office"
+      ],
+      "nepali": [
+        "चलचित्र", "फिल्म", "कलाकार", "अभिनेता", "अभिनेत्री", "गायक", "गीत",
+        "संगीत", "एल्बम", "कन्सर्ट", "पर्व", "दशैं", "तिहार", "नाटक",
+        "कला", "फेसन", "संस्कृति", "मनोरञ्जन"
+      ]
+    },
+    "world": {
+      "emoji": "🌍",
+      "label": "World",
+      "urlHints": ["/world", "/international", "/global"],
+      "keywords": [
+        "united states", "china", "india", "russia", "ukraine", "europe", "un",
+        "international", "global", "war", "treaty", "summit", "diplomat", "embassy",
+        "foreign", "border", "who", "climate", "earthquake", "typhoon", "sanctions"
+      ],
+      "nepali": [
+        "अमेरिका", "चीन", "भारत", "रुस", "युक्रेन", "युरोप", "अन्तर्राष्ट्रिय",
+        "विश्व", "युद्ध", "सम्मेलन", "कूटनीति", "दूतावास", "सीमा",
+        "जलवायु", "भूकम्प", "विदेश"
+      ]
+    }
+  },
+  "default": "world"
+}

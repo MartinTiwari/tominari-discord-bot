@@ -1,0 +1,107 @@
+{
+  "timezone": "Asia/Kathmandu",
+  "locale": "en-NP",
+  "channels": {
+    "politics": "1535670284949135542",
+    "business": "1535670289151565975",
+    "sports": "1535670293056594020",
+    "tech": "1535670296819007671",
+    "entertainment": "1535670302090989620",
+    "world": "1535670305744486440",
+    "social-feed": "1535670309477417000",
+    "health": "1535673313513316453"
+  },
+  "schedules": {
+    "socialFeed": "*/30 * * * *",
+    "morningBrief": "0 6 * * *",
+    "eveningRecap": "0 22 * * *",
+    "sportsMorning": "0 9 * * *",
+    "sportsEvening": "0 19 * * *",
+    "healthReminder": "*/30 * * * *"
+  },
+  "news": {
+    "storiesPerCategory": 3,
+    "socialSummaryLength": 150,
+    "briefSummaryLength": 320,
+    "maxSocialPostsPerCycle": 8,
+    "maxAgeHours": 24
+  },
+  "health": {
+    "defaultLanguage": "nepali",
+    "defaultTone": "tikho",
+    "quietHours": {
+      "start": 23,
+      "end": 6
+    },
+    "badgeMilestones": [
+      7,
+      30,
+      60,
+      90,
+      365
+    ],
+    "mentionUserId": "1524111328854409347"
+  },
+  "sports": {
+    "defaultTeams": [
+      "Bayern Munich",
+      "Barcelona",
+      "Real Madrid"
+    ],
+    "leagues": {
+      "premier": {
+        "name": "Premier League",
+        "apiId": 39,
+        "emoji": "🏴"
+      },
+      "laliga": {
+        "name": "La Liga",
+        "apiId": 140,
+        "emoji": "🇪🇸"
+      },
+      "bundesliga": {
+        "name": "Bundesliga",
+        "apiId": 78,
+        "emoji": "🇩🇪"
+      },
+      "seriea": {
+        "name": "Serie A",
+        "apiId": 135,
+        "emoji": "🇮🇹"
+      },
+      "ucl": {
+        "name": "UEFA Champions League",
+        "apiId": 2,
+        "emoji": "🏆"
+      }
+    },
+    "teams": {
+      "bayern": {
+        "name": "Bayern Munich",
+        "apiId": 157,
+        "league": "bundesliga"
+      },
+      "barca": {
+        "name": "Barcelona",
+        "apiId": 529,
+        "league": "laliga"
+      },
+      "realmadrid": {
+        "name": "Real Madrid",
+        "apiId": 541,
+        "league": "laliga"
+      }
+    }
+  },
+  "colors": {
+    "politics": 3447003,
+    "business": 15844367,
+    "sports": 3066993,
+    "tech": 10181046,
+    "entertainment": 15418782,
+    "world": 1752220,
+    "social": 16750848,
+    "health": 10038562,
+    "error": 15158332
+  }
+}
