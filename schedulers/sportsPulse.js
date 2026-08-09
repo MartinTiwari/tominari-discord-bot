@@ -44,9 +44,19 @@ async function run(client, slot = 'morning') {
       .setFooter({ text: `Tominari • ${formatDateTime()}` }));
   }
 
-  // Upcoming fixtures per tracked team.
+  // Morning looks ahead; evening looks back at what was actually played.
   for (const key of teamKeys) {
     const team = sportsApi.resolveTeam(key);
+
+    if (slot === 'evening') {
+      const results = await sportsApi.getRecentResults(key, 3);
+      if (results.data.length) {
+        cards.push(embeds.resultsEmbed(team.name, results.data, { note: results.note }));
+        continue;
+      }
+      // Nothing played recently — fall through and show what is coming up.
+    }
+
     const { data, note } = await sportsApi.getUpcomingFixtures(key, 3);
     if (data.length) cards.push(embeds.fixtureEmbed(team.name, data, { note }));
   }

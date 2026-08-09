@@ -2,9 +2,13 @@
 
 A Discord bot for Nepal news, football tracking, and *tikho* anti-smoking reminders.
 
-- **Real-time social feed** — polls 14 Nepali outlets every 30 minutes and posts anything new
+- **Real-time social feed** — RONB plus five established Nepali newsrooms, polled every
+  30 minutes. Each story is **summarised from the article page**, not just headlined, so
+  you get the gist without opening the link. Birthday wishes and sponsor plugs get
+  [roasted instead of reported](#news-vs-filler).
 - **Morning brief (6:00) & evening recap (22:00)** — detailed stories across 6 category channels
-- **Sports** — standings, fixtures and favourites for Bayern, Barça, Real Madrid and the top 5 leagues
+- **Sports** — live standings, fixtures and results for Bayern, Barça, Real Madrid and the
+  top 5 leagues. **No API key needed.**
 - **Health** — streak tracking with brutal Nepali motivation every 30 minutes
 
 All times are Nepal time (`Asia/Kathmandu`, UTC+05:45).
@@ -50,13 +54,49 @@ with Developer Mode on) into `config.json` → `channels`, or into `.env`:
 Env vars win over `config.json`. Any category left blank is simply skipped
 (the bot logs a warning at startup rather than failing).
 
-### 4. API keys (both optional)
+### 4. API keys (all optional)
+
+Nothing here is required — news and sports are both live out of the box.
 
 - `NEWSAPI_KEY` — <https://newsapi.org>, free tier 100 req/day. Without it the
   bot runs on RSS feeds alone.
 - `SPORTS_API_KEY` — RapidAPI [API-Football](https://rapidapi.com/api-sports/api/api-football).
-  Without it `/standings` and `/next-match` serve the bundled offline snapshot
-  and label it as such.
+  Sports already run live through TheSportsDB, which needs no key; add this one
+  only if you want full 18/20-team tables instead of the top 5.
+- **RONB access** — see [Reading RONB](#reading-ronb) below.
+
+### Reading RONB
+
+[Routine of Nepal Banda](https://www.facebook.com/officialroutineofnepalbanda) is the
+fastest source in Nepal for bandas, chakka jams and road closures, so it drives the
+social feed. Neither Facebook nor Instagram will serve its posts to a server without
+credentials, so pick one route in `.env`:
+
+| Route | What it needs | Notes |
+|---|---|---|
+| Meta Graph API | `FB_PAGE_ACCESS_TOKEN` + `RONB_FB_PAGE_ID` / `IG_USER_ID` | Best quality. Meta grants tokens only for accounts you control. |
+| RSS bridge | `RONB_FB_FEED` / `RONB_IG_FEED` | Easiest. Make a feed at rss.app, fetchrss.com or your own RSSHub and paste the URL. |
+| X embed timeline | nothing — on by default | Reads [@RONBupdates](https://x.com/RONBupdates). Dormant since Sept 2025, so it usually returns nothing. Disable with `RONB_DISABLE_X=true`. |
+| Their own site | nothing — on by default | `routineofnepalbanda.com` is currently HTTP 522. Left enabled so it resumes on its own. |
+
+With none of them working the feed still runs on the newspapers; you just lose the
+banda alerts. Every route is polled, deduplicated against the others, and anything
+older than `news.maxAgeHours` is dropped so a route coming back online can't dump
+its archive into the channel.
+
+### News vs filler
+
+RONB posts birthday wishes and sponsored plugs alongside real news.
+`utils/postClassifier.js` sorts them by keyword (English, Nepali and romanised), and
+the feed treats them differently:
+
+- **News** → summarised properly and posted as a story.
+- **Filler** → a one-line roast from `data/ronbRoasts.json`, capped at
+  `ronb.maxRoastsPerCycle` per cycle, and never promoted into a brief.
+
+A post that merely mentions a brand or a festival still counts as news — "Ncell
+announces free data after the quake" is reporting, not an ad. Turn roasting off with
+`ronb.roastNonNews: false` in `config.json`.
 
 ### 5. Register commands and run
 
@@ -200,9 +240,13 @@ bot.js                 client, interaction router, graceful shutdown
 deploy-commands.js     slash-command registration
 commands/              news, sports, health, social
 schedulers/            six cron jobs (social feed, brief, recap, sports ×2, health)
-scrapers/              RSS, Facebook, Instagram, deduplicator
-services/              newsIngest (fetch → classify → store), publisher (send → record)
-utils/                 database, config, embeds, http, classifier, time, text, logger
+scrapers/              RSS, RONB (multi-route), Facebook, Instagram, deduplicator
+services/              newsIngest (fetch → classify → summarise → store),
+                       summarizer (article body → extractive summary),
+                       publisher (send → record)
+utils/                 database, config, embeds, http, time, text, logger,
+                       categoryClassifier (which channel), postClassifier (news vs filler),
+                       sportsApi (API-Football) + sportsDb (TheSportsDB, keyless)
 data/                  sources, categories, quotes, offline sports data, SQLite file
 scripts/               selftest.js, dryrun.js
 ```

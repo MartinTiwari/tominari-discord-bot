@@ -163,7 +163,7 @@ const toggleSource = {
   async execute(interaction) {
     const name = interaction.options.getString('name').trim();
     const active = interaction.options.getBoolean('active');
-    const changed = db.setSourceActive(name, active);
+    const changed = db.setSourceActive(name, active, { manual: true });
 
     await interaction.reply({
       content: changed

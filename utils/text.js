@@ -18,9 +18,24 @@ function stripHtml(html) {
     .replace(/&lt;/gi, '<')
     .replace(/&gt;/gi, '>')
     .replace(/&hellip;/gi, '…')
+    .replace(/&#(\d+);/g, (_, code) => safeCodePoint(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => safeCodePoint(parseInt(code, 16)))
     .replace(/&[a-z]+;/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+/**
+ * Numeric entities carry the curly quotes and dashes WordPress feeds are full
+ * of (&#8217;, &#8230;). Out-of-range values are dropped rather than thrown on.
+ */
+function safeCodePoint(code) {
+  if (!Number.isInteger(code) || code < 32 || code > 0x10ffff) return ' ';
+  try {
+    return String.fromCodePoint(code);
+  } catch {
+    return ' ';
+  }
 }
 
 /**

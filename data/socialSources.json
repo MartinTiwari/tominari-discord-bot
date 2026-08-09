@@ -1,23 +1,34 @@
 {
-  "_comment": "Every `feed` below was probed live on 2026-08-08 and the item count recorded in `_verified`. RSS is the primary transport: it is public, ToS-clean and needs no API approval. `url` is the social page, used for attribution and by the optional Graph API scrapers. Sources with `active: false` are kept visible in /sources so you can re-enable them if their feed returns — see `_status` for why each is paused.",
+  "_comment": "Deliberately short list — established Nepali newsrooms with a real editorial desk, plus RONB for banda/strike alerts. Aggregators, republishers and outlets whose feeds have gone stale were removed: more sources meant more duplicates and more junk, not better coverage. Every `feed` here was probed live and its item count recorded in `_verified`. RONB is read through scrapers/ronbScraper.js (Meta Graph API or an RSS bridge you configure), not through a feed URL — see .env.example.",
   "sources": [
     {
+      "name": "RONB",
+      "platform": "ronb",
+      "url": "https://www.facebook.com/officialroutineofnepalbanda",
+      "feed": null,
+      "priority": "HIGH",
+      "active": true,
+      "_why": "Routine of Nepal Banda — first to report bandas, chakka jams, road closures and curfews, which is exactly what this server needs same-day. Birthday and sponsor posts get roasted instead of reported."
+    },
+    {
       "name": "Kathmandu Post",
-      "platform": "facebook",
-      "url": "https://www.facebook.com/kathmandupost",
+      "platform": "rss",
+      "url": "https://kathmandupost.com/",
       "feed": "https://kathmandupost.com/rss",
       "priority": "HIGH",
       "active": true,
-      "_verified": "40 items"
+      "_verified": "40 items",
+      "_why": "Kantipur Media Group's English daily — the most consistently sourced English reporting in Nepal, and its pages carry full article bodies the summariser can read."
     },
     {
       "name": "Setopati",
-      "platform": "facebook",
-      "url": "https://www.facebook.com/setopati",
+      "platform": "rss",
+      "url": "https://www.setopati.com/",
       "feed": "https://www.setopati.com/feed",
       "priority": "HIGH",
       "active": true,
-      "_verified": "5 items (Nepali)"
+      "_verified": "5 items (Nepali)",
+      "_why": "Largest independent Nepali-language newsroom; breaks political stories ahead of the English dailies."
     },
     {
       "name": "Online Khabar English",
@@ -26,34 +37,8 @@
       "feed": "https://english.onlinekhabar.com/feed",
       "priority": "HIGH",
       "active": true,
-      "_verified": "20 items"
-    },
-    {
-      "name": "Online Khabar Nepali",
-      "platform": "rss",
-      "url": "https://www.onlinekhabar.com/",
-      "feed": "https://www.onlinekhabar.com/feed",
-      "priority": "MEDIUM",
-      "active": true,
-      "_verified": "55 items (Nepali)"
-    },
-    {
-      "name": "Ratopati English",
-      "platform": "rss",
-      "url": "https://english.ratopati.com/",
-      "feed": "https://english.ratopati.com/feed",
-      "priority": "MEDIUM",
-      "active": true,
-      "_verified": "30 items"
-    },
-    {
-      "name": "Nepal Minute",
-      "platform": "rss",
-      "url": "https://nepalminute.com/",
-      "feed": "https://nepalminute.com/feed",
-      "priority": "MEDIUM",
-      "active": true,
-      "_verified": "30 items"
+      "_verified": "20 items",
+      "_why": "High-volume English desk with good coverage of business, tech and Kathmandu civic news."
     },
     {
       "name": "The Annapurna Express",
@@ -62,7 +47,8 @@
       "feed": "https://theannapurnaexpress.com/rss",
       "priority": "MEDIUM",
       "active": true,
-      "_verified": "20 items"
+      "_verified": "20 items",
+      "_why": "Weekly with longer analysis pieces — thin on breaking news, useful for context in the evening recap."
     },
     {
       "name": "The Rising Nepal",
@@ -71,61 +57,8 @@
       "feed": "https://risingnepaldaily.com/rss",
       "priority": "MEDIUM",
       "active": true,
-      "_verified": "10 items"
-    },
-    {
-      "name": "Nepal News",
-      "platform": "rss",
-      "url": "https://www.nepalnews.com/",
-      "feed": "https://www.nepalnews.com/feed",
-      "priority": "LOW",
-      "active": true,
-      "_verified": "12 items (Nepali)"
-    },
-    {
-      "name": "The Himalayan Times",
-      "platform": "facebook",
-      "url": "https://www.facebook.com/thehimalayantimes",
-      "feed": "https://thehimalayantimes.com/rss",
-      "priority": "HIGH",
-      "active": false,
-      "_status": "PAUSED — /feed returns 404 and /rss serves an HTML page, not XML. Re-enable with /toggle-source if they restore a real feed, or set FB_PAGE_ACCESS_TOKEN to read the page via the Graph API."
-    },
-    {
-      "name": "eKantipur",
-      "platform": "facebook",
-      "url": "https://www.facebook.com/ekantipur",
-      "feed": "https://ekantipur.com/rss",
-      "priority": "HIGH",
-      "active": false,
-      "_status": "PAUSED — /rss, /feed and /news/rss all return an HTML shell with no items. Their English sister site Kathmandu Post (active above) carries the same newsroom's output."
-    },
-    {
-      "name": "My Republica",
-      "platform": "facebook",
-      "url": "https://www.facebook.com/MyRepublicaNagarik",
-      "feed": "https://myrepublica.nagariknetwork.com/rss",
-      "priority": "MEDIUM",
-      "active": false,
-      "_status": "PAUSED — every RSS path tested returns 404/403. Needs FB_PAGE_ACCESS_TOKEN + the numeric page id to read via the Graph API."
-    },
-    {
-      "name": "Nepal24Hours",
-      "platform": "facebook",
-      "url": "https://www.facebook.com/nepal24hours",
-      "feed": "https://www.nepal24hours.com/feed/",
-      "priority": "LOW",
-      "active": false,
-      "_status": "PAUSED — domain does not resolve (DNS failure); the site appears to be offline."
-    },
-    {
-      "name": "RONB",
-      "platform": "instagram",
-      "url": "https://www.instagram.com/routine_of_nepal_banda/",
-      "feed": "https://routineofnepalbanda.com/feed/",
-      "priority": "HIGH",
-      "active": false,
-      "_status": "PAUSED — the mirror site returns HTTP 522 (origin down). Instagram itself needs FB_PAGE_ACCESS_TOKEN + IG_USER_ID, which Meta only grants for accounts you control."
+      "_verified": "10 items",
+      "_why": "Gorkhapatra Sansthan's English daily — state-run, so it carries official notices and government decisions verbatim."
     }
   ]
 }

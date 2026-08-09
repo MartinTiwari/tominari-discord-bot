@@ -115,6 +115,26 @@ CREATE INDEX IF NOT EXISTS idx_news_category        ON news_articles(category, s
 CREATE INDEX IF NOT EXISTS idx_news_published       ON news_articles(published_at);
 `);
 
+/**
+ * Additive migrations for databases created by an earlier version. SQLite has
+ * no "ADD COLUMN IF NOT EXISTS", so we check the table info first.
+ */
+function addColumn(table, column, definition) {
+  const exists = db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === column);
+  if (exists) return;
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  log.info(`Migrated: ${table}.${column} added`);
+}
+
+// What kind of post this is — 'news' or a filler kind from postClassifier.
+addColumn('social_posts', 'post_kind', `TEXT NOT NULL DEFAULT 'news'`);
+// Which platform a RONB post came from, so the embed can label it FB vs IG.
+addColumn('social_posts', 'platform', 'TEXT');
+// Where the summary text came from: 'body' (article page), 'feed' or 'title'.
+addColumn('social_posts', 'summary_origin', 'TEXT');
+// Set when a person toggled this source by hand, so seeding leaves it alone.
+addColumn('social_sources', 'manual_override', 'INTEGER NOT NULL DEFAULT 0');
+
 // ----------------------------------------------------------------- users ----
 
 const stmts = {
@@ -304,9 +324,18 @@ function getAllSources() {
   return db.prepare(`SELECT * FROM social_sources ORDER BY id`).all();
 }
 
-function setSourceActive(name, active) {
-  return db.prepare(`UPDATE social_sources SET is_active = ? WHERE source_name = ?`)
-    .run(active ? 1 : 0, name).changes;
+/**
+ * Enable or disable a source.
+ *
+ * `manual` marks the row as deliberately set by a person via /toggle-source,
+ * which stops the seeder from flipping it back on the next restart. Seeding and
+ * other automatic paths leave the flag alone.
+ */
+function setSourceActive(name, active, { manual = false } = {}) {
+  const sql = manual
+    ? `UPDATE social_sources SET is_active = ?, manual_override = 1 WHERE source_name = ?`
+    : `UPDATE social_sources SET is_active = ? WHERE source_name = ?`;
+  return db.prepare(sql).run(active ? 1 : 0, name).changes;
 }
 
 function touchSource(id, errorMessage = null) {
@@ -325,10 +354,10 @@ function insertSocialPost(post) {
   const info = db.prepare(`
     INSERT INTO social_posts
       (source_id, external_post_id, title, content, summary, url, image_url,
-       category, posted_at, likes, comments)
+       category, posted_at, likes, comments, post_kind, platform, summary_origin)
     VALUES
       (@source_id, @external_post_id, @title, @content, @summary, @url, @image_url,
-       @category, @posted_at, @likes, @comments)
+       @category, @posted_at, @likes, @comments, @post_kind, @platform, @summary_origin)
     ON CONFLICT(external_post_id) DO NOTHING`)
     .run({
       source_id: post.source_id ?? null,
@@ -342,6 +371,9 @@ function insertSocialPost(post) {
       posted_at: post.posted_at ?? null,
       likes: post.likes ?? 0,
       comments: post.comments ?? 0,
+      post_kind: post.post_kind ?? 'news',
+      platform: post.platform ?? null,
+      summary_origin: post.summary_origin ?? null,
     });
   return info.changes ? info.lastInsertRowid : null;
 }
@@ -351,14 +383,19 @@ function markSocialPostSent(id, channelId, messageId) {
     .run(channelId, messageId, id);
 }
 
-/** Highest-engagement posts from the last N hours, newest first on ties. */
+/**
+ * Highest-engagement posts from the last N hours, newest first on ties.
+ * Filler (birthday wishes, sponsor plugs) is excluded — it gets roasted in the
+ * live feed and must never be promoted into a news brief.
+ */
 function getTopSocialPosts(hours = 24, limit = 10, category = null) {
   const where = category ? `AND category = @category` : '';
   return db.prepare(`
     SELECT sp.*, ss.source_name
       FROM social_posts sp
       LEFT JOIN social_sources ss ON ss.id = sp.source_id
-     WHERE sp.fetched_at >= datetime('now', @window) ${where}
+     WHERE sp.fetched_at >= datetime('now', @window)
+       AND sp.post_kind = 'news' ${where}
      ORDER BY (sp.likes + sp.comments * 2) DESC, sp.posted_at DESC
      LIMIT @limit`)
     .all({ window: `-${hours} hours`, limit, category });

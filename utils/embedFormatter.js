@@ -2,7 +2,7 @@
 
 const { EmbedBuilder } = require('discord.js');
 const config = require('./config');
-const { truncate, summarize } = require('./text');
+const { truncate, summarize, pick } = require('./text');
 const { relativeTime, formatDateTime } = require('./time');
 const classifier = require('./categoryClassifier');
 
@@ -21,11 +21,29 @@ function safeUrl(url) {
   return /^https?:\/\//i.test(url) ? url : null;
 }
 
+const PLATFORM_BADGE = {
+  facebook: '📘 Facebook',
+  instagram: '📸 Instagram',
+  twitter: '𝕏',
+  web: '🌐',
+};
+
+/** Where a summary came from, shown so nobody mistakes a teaser for the story. */
+function originNote(origin) {
+  if (origin === 'body') return '📖 full story';
+  if (origin === 'feed') return '📰 from the feed';
+  return null;
+}
+
 /** Compact embed for the real-time social feed. */
 function socialPostEmbed(post, sourceName) {
+  const platform = PLATFORM_BADGE[post.platform] || null;
+  const author = [`📱 ${sourceName || post.source_name || 'Nepal Feed'}`, platform]
+    .filter(Boolean).join('  •  ');
+
   const embed = new EmbedBuilder()
     .setColor(config.colorFor('social'))
-    .setAuthor({ name: `📱 ${sourceName || post.source_name || 'Nepal Feed'}` })
+    .setAuthor({ name: author })
     .setTitle(truncate(post.title || 'Untitled post', 250))
     .setDescription(summarize(post.summary || post.content || '', config.news.socialSummaryLength))
     .setTimestamp(post.posted_at ? new Date(`${String(post.posted_at).replace(' ', 'T')}Z`) : new Date());
@@ -38,9 +56,42 @@ function socialPostEmbed(post, sourceName) {
   if (post.likes) engagement.push(`👍 ${formatCount(post.likes)}`);
   if (post.comments) engagement.push(`💬 ${formatCount(post.comments)}`);
   engagement.push(`🕐 ${relativeTime(post.posted_at || post.fetched_at)}`);
+  const origin = originNote(post.summary_origin);
+  if (origin) engagement.push(origin);
 
   const cat = classifier.meta(post.category || 'world');
   embed.setFooter({ text: `${cat.emoji} ${cat.label}  •  ${engagement.join('  •  ')}` });
+
+  return embed;
+}
+
+/**
+ * The reaction to a post that turned out to be a birthday wish, a sponsor plug
+ * or festival filler rather than news.
+ *
+ * It still links the original and quotes a line of it, so anyone who does care
+ * can go look — the joke is about the post not being news, and hiding it
+ * entirely would just look like the feed was broken.
+ */
+function roastEmbed(post, roasts) {
+  const kind = post.post_kind || 'promo';
+  const opener = pick(roasts.openers[kind] || roasts.openers.promo);
+  const closer = Math.random() < 0.5 ? `\n\n_${pick(roasts.closers)}_` : '';
+  const quoted = truncate(post.title || post.content || '', 180);
+
+  const embed = new EmbedBuilder()
+    .setColor(config.colorFor('social'))
+    .setAuthor({ name: `📱 ${post.source_name || 'RONB'}  •  ${PLATFORM_BADGE[post.platform] || 'post'}` })
+    .setTitle(roasts.titles[kind] || '🙄 News hoina')
+    .setDescription(`${opener}${closer}`)
+    .setFooter({ text: `🗑️ filler • ${relativeTime(post.posted_at || post.fetched_at)}` })
+    .setTimestamp(post.posted_at ? new Date(`${String(post.posted_at).replace(' ', 'T')}Z`) : new Date());
+
+  if (quoted) embed.addFields({ name: 'Unle lekheko', value: `> ${quoted}` });
+
+  const url = safeUrl(post.url);
+  if (url) embed.setURL(url);
+  if (safeUrl(post.image_url)) embed.setThumbnail(post.image_url);
 
   return embed;
 }
@@ -168,6 +219,33 @@ function fixtureEmbed(team, fixtures, { note = null } = {}) {
   return embed;
 }
 
+/**
+ * Recent results for a team. Same shape as `fixtureEmbed`, but the score leads
+ * — that is the part anyone reading an evening post actually wants.
+ */
+function resultsEmbed(team, results, { note = null } = {}) {
+  const embed = new EmbedBuilder()
+    .setColor(config.colorFor('sports'))
+    .setTitle(`📋 ${team} — Latest results`)
+    .setTimestamp();
+
+  if (!results.length) {
+    embed.setDescription('_No recent results found._');
+  } else {
+    for (const r of results.slice(0, 5)) {
+      embed.addFields({
+        name: `${r.home}  ${r.score || 'vs'}  ${r.away}`,
+        value: [
+          `📅 ${r.date}`,
+          r.competition ? `🏆 ${r.competition}` : null,
+        ].filter(Boolean).join('\n'),
+      });
+    }
+  }
+  if (note) embed.setFooter({ text: note });
+  return embed;
+}
+
 /** Consistent red error card so failures never look like a crash to users. */
 function errorEmbed(title, detail) {
   return new EmbedBuilder()
@@ -192,12 +270,14 @@ function formatCount(n) {
 
 module.exports = {
   socialPostEmbed,
+  roastEmbed,
   newsArticleEmbed,
   briefHeaderEmbed,
   streakEmbed,
   motivationEmbed,
   standingsEmbed,
   fixtureEmbed,
+  resultsEmbed,
   errorEmbed,
   progressBar,
   formatCount,

@@ -162,12 +162,22 @@ async function main() {
   });
 
   check('paused sources stay paused across a re-seed', () => {
-    db.setSourceActive('Kathmandu Post', false);
+    // `manual` is what /toggle-source sets; without it the seeder is free to
+    // re-enable a source that the shipped file lists as active.
+    db.setSourceActive('Kathmandu Post', false, { manual: true });
     ingest.seedSources();
     assert(db.getAllSources().find((s) => s.source_name === 'Kathmandu Post').is_active === 0,
       're-seed re-activated a manually paused source');
-    db.setSourceActive('Kathmandu Post', true);
+    db.setSourceActive('Kathmandu Post', true, { manual: true });
     return 'user toggle survives restart';
+  });
+
+  check('a source removed from the file stops being polled', () => {
+    db.upsertSource({ name: 'Test Retired Outlet', platform: 'rss', feed: 'https://x.invalid/rss', active: true });
+    ingest.seedSources();
+    const row = db.getAllSources().find((s) => s.source_name === 'Test Retired Outlet');
+    assert(row.is_active === 0, 'an unlisted source stayed active after re-seed');
+    return 'unlisted sources are retired';
   });
 
   check('malformed XML is repaired', () => {
@@ -226,6 +236,103 @@ async function main() {
     assert(classifier.priorityFor({ title: 'Breaking: earthquake hits Nepal' }) === 'HIGH', 'urgent not HIGH');
     assert(classifier.priorityFor({ title: 'Weather stays clear' }) === 'LOW', 'mundane not LOW');
     return 'ok';
+  });
+
+  // ------------------------------------------------- news vs filler ----
+  console.log('\nPost kind (news vs filler)');
+  const postKind = require('../utils/postClassifier');
+  const roastLines = require('../data/ronbRoasts.json');
+
+  check('filler posts are recognised', () => {
+    const filler = [
+      ['Happy Birthday to our beloved actor Rajesh Hamal!', 'birthday'],
+      ['Sponsored: 20% off all electronics. Use coupon code DASHAIN20.', 'promo'],
+      ['Happy Dashain to all Nepali brothers and sisters! Shubhakamana.', 'greeting'],
+      ['Tag a friend who needs to see this', 'engagement'],
+      ['This post is brought to you by our official partner.', 'sponsored'],
+    ];
+    for (const [text, expected] of filler) {
+      const got = postKind.classifyKind({ title: text, content: text, source_name: 'RONB' });
+      assert(!got.isNews, `"${text.slice(0, 30)}…" was treated as news`);
+      assert(got.kind === expected, `expected ${expected}, got ${got.kind}`);
+    }
+    return `${filler.length} filler kinds correct`;
+  });
+
+  check('real news survives the filler filter', () => {
+    const news = [
+      'Kathmandu-Terai fast track obstructed at Khokana due to local protest.',
+      'Nepal Bandh tomorrow: schools and transport to remain closed in the Valley.',
+      'Earthquake of magnitude 5.3 recorded in Bajhang, no casualties reported.',
+      // Names a brand and a festival, but is still reporting.
+      'Ncell announces free data for Dashain after the government issued a directive.',
+    ];
+    for (const text of news) {
+      const got = postKind.classifyKind({ title: text, content: text, source_name: 'RONB' });
+      assert(got.isNews, `"${text.slice(0, 40)}…" was wrongly roasted as ${got.kind}`);
+    }
+    return `${news.length} news items kept`;
+  });
+
+  check('an empty post never crashes the classifier', () => {
+    const got = postKind.classifyKind({});
+    assert(got.isNews === true, 'empty post should default to news');
+    return 'defaults to news';
+  });
+
+  check('every filler kind has roast lines and builds an embed', () => {
+    for (const kind of Object.values(postKind.KINDS)) {
+      if (kind === postKind.KINDS.NEWS) continue;
+      assert(Array.isArray(roastLines.openers[kind]) && roastLines.openers[kind].length,
+        `no roast openers for "${kind}"`);
+      assert(roastLines.titles[kind], `no roast title for "${kind}"`);
+
+      const built = embeds.roastEmbed(
+        { source_name: 'RONB', platform: 'instagram', post_kind: kind, title: 'Test post', posted_at: null },
+        roastLines,
+      ).toJSON();
+      assert(built.description && built.description.length > 10, `empty roast for "${kind}"`);
+    }
+    return `${Object.keys(roastLines.openers).length} kinds covered`;
+  });
+
+  // ---------------------------------------------------------- summariser ----
+  console.log('\nSummariser');
+  const summarizer = require('../services/summarizer');
+
+  check('article body is pulled out of page markup', () => {
+    const html = `<html><body><nav><p>Home News Sports</p></nav>
+      <aside class="left-side"><div class="editor-box">
+        <p>The government has decided to close all schools in the Kathmandu Valley on Monday following the announced strike.</p>
+        <p>Traffic police said diversions would be in place on the Ring Road from early morning until the evening.</p>
+      </div></aside>
+      <footer><p>Copyright 2026</p></footer></body></html>`;
+    const body = summarizer.extractBody(html);
+    assert(/government has decided/.test(body), 'article text was dropped');
+    assert(!/Copyright/.test(body), 'footer boilerplate leaked in');
+    assert(!/Home News Sports/.test(body), 'navigation leaked in');
+    return `${body.length} chars extracted`;
+  });
+
+  check('summary keeps whole sentences in their original order', () => {
+    const body = 'Police arrested three people in Siraha on Saturday evening. '
+      + 'The suspects were carrying banned medicines, according to the district office. '
+      + 'Officers said the investigation is continuing. '
+      + 'A court hearing has been scheduled for Sunday.';
+    const out = summarizer.extractive(body, 'Three held in Siraha with banned medicines', 200);
+    assert(out.length <= 200, `summary ran to ${out.length} chars`);
+    assert(/[.!?]$/.test(out.trim()), 'summary ends mid-sentence');
+    assert(body.indexOf(out.split('. ')[0]) >= 0, 'summary invented text');
+    return `${out.length} chars`;
+  });
+
+  check('Nepali sentences split on the danda', () => {
+    const parts = summarizer.splitSentences(
+      'नेपाल सरकारले सोमबार विद्यालय बन्द गर्ने निर्णय गरेको छ। '
+      + 'प्रहरीले काठमाडौं उपत्यकामा सुरक्षा बढाइएको जनाएको छ।',
+    );
+    assert(parts.length === 2, `expected 2 sentences, got ${parts.length}`);
+    return `${parts.length} sentences`;
   });
 
   // ------------------------------------------------------ deduplicator ----
@@ -401,11 +508,24 @@ async function main() {
     assert(sportsApi.resolveLeague('bayern')?.key === 'bundesliga', 'team → league failed');
     return 'ok';
   });
-  await checkAsync('standings fall back to the offline snapshot', async () => {
-    const { data, live } = await sportsApi.getStandings('bundesliga');
-    assert(data.length > 0, 'no rows returned');
-    if (!sportsApi.isConfigured()) assert(live === false, 'claimed live without an API key');
+  await checkAsync('standings always return a usable table', async () => {
+    // Live data no longer depends on SPORTS_API_KEY: TheSportsDB serves the
+    // table without one, and the bundled snapshot is the last resort.
+    const { data, live, note } = await sportsApi.getStandings('bundesliga');
+    assert(data.length > 0, 'no rows returned by any provider');
+    assert(data.every((r) => r.team && Number.isFinite(r.points)),
+      'a row is missing a team name or points');
+    assert(typeof note === 'string' && note.length > 0, 'no provenance note');
+    assert(live || /snapshot/i.test(note), 'stale data was not labelled as a snapshot');
     return `${data.length} rows, live=${live}`;
+  });
+
+  await checkAsync('fixtures come back without an API key', async () => {
+    const { data, note } = await sportsApi.getUpcomingFixtures('bayern', 3);
+    assert(typeof note === 'string', 'no note returned');
+    // An off-season week legitimately has no fixtures; the shape still must hold.
+    assert(data.every((f) => f.home && f.away), 'a fixture is missing a team');
+    return data.length ? `${data.length} fixtures` : 'none scheduled (off-season)';
   });
 
   // -------------------------------------------------------- selection ----

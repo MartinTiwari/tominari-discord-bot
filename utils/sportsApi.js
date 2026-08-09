@@ -4,14 +4,21 @@ const log = require('../utils/logger')('sports');
 const { getJson } = require('./http');
 const { formatDateTime } = require('./time');
 const config = require('./config');
+const sportsDb = require('./sportsDb');
 const fallback = require('../data/sportsFallback.json');
 
 /**
- * API-Football (RapidAPI) client with a bundled static fallback.
+ * Football data, from the best source available, in this order:
  *
- * Every public function returns `{ data, live, note }` so callers can label
- * clearly whether the numbers came off the wire or out of the snapshot file.
- * Nothing here ever throws — sports data is nice-to-have, not critical.
+ *   1. API-Football (RapidAPI)  — full tables and rich fixture detail, but
+ *      needs SPORTS_API_KEY and allows only 100 calls/day on the free tier.
+ *   2. TheSportsDB              — no key required, so this is what actually
+ *      runs on most installs. Live, if a little sparser.
+ *   3. data/sportsFallback.json — a dated snapshot, clearly labelled as such.
+ *
+ * Every public function returns `{ data, live, note }` so callers can say
+ * plainly where the numbers came from. Nothing here throws: sports data is
+ * nice-to-have and must never take a scheduler down.
  */
 
 const HOST = 'api-football-v1.p.rapidapi.com';
@@ -128,12 +135,23 @@ async function getStandings(leagueKey) {
     }
   }
 
+  // No key, or the key returned nothing — try the keyless provider.
+  const live = await sportsDb.getStandings(league.key);
+  if (live.data.length) {
+    return {
+      data: live.data,
+      live: true,
+      note: `${league.name} • ${live.note}`
+        + (live.data.length <= 5 ? ' (top 5 — add SPORTS_API_KEY for the full table)' : ''),
+    };
+  }
+
   const snapshot = fallback.standings[league.key] || [];
   return {
     data: snapshot,
     live: false,
     note: snapshot.length
-      ? `⚠️ Offline snapshot from ${fallback.snapshotDate} — set SPORTS_API_KEY for live data`
+      ? `⚠️ Offline snapshot from ${fallback.snapshotDate} — live sources unreachable`
       : 'No data available for this league.',
   };
 }
@@ -170,17 +188,37 @@ async function getUpcomingFixtures(teamKey, count = 5) {
     }
   }
 
+  const live = await sportsDb.getUpcomingFixtures(team.key, count);
+  if (live.data.length) return { data: live.data, live: true, note: `${team.name} • ${live.note}` };
+
   return {
     data: [],
     live: false,
-    note: `⚠️ Fixtures need SPORTS_API_KEY (API-Football via RapidAPI). Add it to .env to enable live schedules for ${team.name}.`,
+    note: `No upcoming fixtures listed for ${team.name} right now — probably an international break or the off-season.`,
+  };
+}
+
+/**
+ * Most recent results for a team. Only TheSportsDB serves these today;
+ * API-Football's equivalent would cost an extra call per team per run.
+ */
+async function getRecentResults(teamKey, count = 5) {
+  const team = resolveTeam(teamKey);
+  if (!team) return { data: [], live: false, note: `Unknown team "${teamKey}".` };
+
+  const live = await sportsDb.getRecentResults(team.key, count);
+  return {
+    data: live.data,
+    live: live.live,
+    note: live.data.length ? `${team.name} • ${live.note}` : `No recent results for ${team.name}.`,
   };
 }
 
 /** Matches played or in progress today for a team. */
 async function getTodayFixtures(teamKey) {
   const team = resolveTeam(teamKey);
-  if (!team || !isConfigured()) return { data: [], live: false, note: null };
+  if (!team) return { data: [], live: false, note: null };
+  if (!isConfigured()) return sportsDb.getTodayFixtures(team.key);
 
   const today = new Date().toISOString().slice(0, 10);
   try {
@@ -201,13 +239,14 @@ async function getTodayFixtures(teamKey) {
     };
   } catch (err) {
     log.warn(`Today fixtures failed for ${team.name}: ${err.message}`);
-    return { data: [], live: false, note: null };
+    return sportsDb.getTodayFixtures(team.key);
   }
 }
 
 module.exports = {
   getStandings,
   getUpcomingFixtures,
+  getRecentResults,
   getTodayFixtures,
   resolveTeam,
   resolveLeague,

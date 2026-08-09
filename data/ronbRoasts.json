@@ -1,0 +1,55 @@
+{
+  "_comment": "Reactions Tominari posts instead of a headline when a page puts out a birthday wish, a sponsor plug or festival filler. Keys match utils/postClassifier KINDS. `openers` are picked per post, `closers` are appended about half the time. Roman Nepali on purpose — this is banter for the server, not a news desk. Keep it teasing, never actually mean.",
+  "titles": {
+    "birthday": "🎂 Yo ta news thiyena",
+    "sponsored": "💸 Paisa ko khel",
+    "promo": "📢 Bigyapan aayo",
+    "greeting": "🙏 Shubhakamana spam",
+    "engagement": "🪤 Bait post"
+  },
+  "openers": {
+    "birthday": [
+      "Chyaa, kunchai ko janmadin pathyo. Ma banda ko khabar kurirathe, yo ta cake ko photo raichha.",
+      "Oe! Malai lagyo bhaneko chakka jam bhayo ki bhanera... birthday wish raichha. Dhoka.",
+      "Happy birthday hai ta, tara maile yo page follow gareko banda ko lagi ho, HBD ko lagi hoina.",
+      "Kasko birthday ho thaha chhaina, tara timro notification kharcha bhayo. Sorry gang.",
+      "Yo manche ko janmadin le mero din banayena. Feed ma keh news aau na yaar."
+    ],
+    "sponsored": [
+      "Chyaa, paisa aayo raichha. News hoina, sponsor ko gungaan ho yo.",
+      "Sponsored post! Matlab aaja ko sacho khabar ko rate kati parcha hola?",
+      "Oe yo ta bigyapan ho ni. Maile scroll gareko khabar ko lagi, brand ko lagi hoina.",
+      "Paid partnership rey. Timro pocket bharyo, mero feed bigriyo.",
+      "Brand ko naam padhera nai thaha bhayo — yo post ma khabar chhaina, budget matra chha."
+    ],
+    "promo": [
+      "Chyaa, discount ko kura pathyo. Ma banda kaile khulcha bhanera basirathe.",
+      "Offer, coupon, hurry up... bhai ma news app ho, shopping app hoina.",
+      "Giveaway rey! Jitne ta arkai hunchha, kharcha hune ta hamro data ho.",
+      "Yo post ma ek euta pani kaam ko kura chhaina, tara emoji ta pura chha.",
+      "Download now, book now, order now — oe ma ta 'khabar now' khojirathe."
+    ],
+    "greeting": [
+      "Shubhakamana ta thik chha, tara yo news feed ho ki greeting card ko dukan?",
+      "Chyaa, festival wish pathyo. Ramro chha, tara mero kaam ko chhaina.",
+      "Sabai lai shubhakamana! Ani ahile khabar kata bata liune ta?",
+      "Yo wish padhera petsa bhariyena, khabar padhera bharincha.",
+      "Namaste, shubhakamana, dhanyabaad — teen ota word ma pura post sakiyo."
+    ],
+    "engagement": [
+      "Chyaa, 'tag a friend' rey. Sathi lai tag garera banda khulchha ra?",
+      "Like, share, comment... bhai algorithm khana khoji rahecha.",
+      "Yo post ko matlab khoji rahe, matlab bhetiyena. Reach matra bhetiyo.",
+      "Bait post detect bhayo. Ma ta bait ma pardina, tara post ta halchhu.",
+      "Question mark le sakiyo post. Uttar chahi mero timeline ma khali thau."
+    ]
+  },
+  "closers": [
+    "Anyway, sacho khabar aayepachi bolaunchu.",
+    "Blablabla. Next post ma news hos bhanne aasha.",
+    "Ma pheri banda kurna gaye.",
+    "Yo post ko lagi timro attention barbad bhayo — sorry, mero galti haina.",
+    "Feed ma keh kaam ko aayo bhane malai thaha huncha, tension nagara.",
+    "Yesto post haru ko lagi mero paisa liudina hai."
+  ]
+}

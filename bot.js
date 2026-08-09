@@ -2,7 +2,9 @@
 
 require('dotenv').config();
 
-const { Client, GatewayIntentBits, Partials, Events, ActivityType, MessageFlags } = require('discord.js');
+const {
+  Client, GatewayIntentBits, Partials, Events, ActivityType, MessageFlags, Status,
+} = require('discord.js');
 
 const log = require('./utils/logger')('bot');
 const config = require('./utils/config');
@@ -39,13 +41,22 @@ let tasks = [];
 
 // ------------------------------------------------------------------ ready ----
 
-client.once(Events.ClientReady, async (readyClient) => {
-  log.info(`Logged in as ${readyClient.user.tag}`);
-
-  readyClient.user.setPresence({
+/**
+ * Presence is not always restored after the gateway drops and resumes, which
+ * is the usual reason a bot that is running still shows as offline. It is
+ * cheap to re-apply, so every path back to READY calls this.
+ */
+function applyPresence(user) {
+  user.setPresence({
     status: 'online',
     activities: [{ name: 'Nepal news & churot-free streaks 🇳🇵', type: ActivityType.Watching }],
   });
+}
+
+client.once(Events.ClientReady, async (readyClient) => {
+  log.info(`Logged in as ${readyClient.user.tag}`);
+
+  applyPresence(readyClient.user);
 
   // Load the tracked source list into SQLite (idempotent).
   ingest.seedSources();
@@ -119,8 +130,56 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
 client.on(Events.Error, (err) => log.error(`Client error: ${err.message}`));
 client.on(Events.Warn, (msg) => log.warn(msg));
-client.on(Events.ShardDisconnect, (_, id) => log.warn(`Shard ${id} disconnected`));
+client.on(Events.ShardDisconnect, (event, id) => {
+  log.warn(`Shard ${id} disconnected (code ${event?.code ?? '?'})`);
+});
 client.on(Events.ShardReconnecting, (id) => log.info(`Shard ${id} reconnecting…`));
+
+// After a resume the session is new, so re-assert presence — otherwise the bot
+// is connected and working but still greyed out in the member list.
+client.on(Events.ShardResume, (id) => {
+  log.info(`Shard ${id} resumed`);
+  if (client.user) applyPresence(client.user);
+});
+
+/**
+ * Gateway watchdog.
+ *
+ * discord.js reconnects on its own, but a shard can end up permanently stuck
+ * (an unresumable session, a half-open socket) with the process still alive
+ * and every cron job still firing into the void. That is exactly the state
+ * where the bot "is running" but shows offline, and nothing restarts it
+ * because nothing crashed.
+ *
+ * So: if the gateway has not been READY for this long, exit non-zero and let
+ * the supervisor (scripts/run-forever.ps1, Docker's restart policy, or the
+ * systemd unit) bring up a clean process.
+ */
+const OFFLINE_GRACE_MS = Number(process.env.GATEWAY_GRACE_MS || 5 * 60 * 1000);
+let lastReadyAt = Date.now();
+
+const watchdog = setInterval(() => {
+  if (client.ws.status === Status.Ready) {
+    lastReadyAt = Date.now();
+    return;
+  }
+
+  const downFor = Math.round((Date.now() - lastReadyAt) / 1000);
+  if (Date.now() - lastReadyAt < OFFLINE_GRACE_MS) {
+    log.warn(`Gateway not ready (status ${client.ws.status}) for ${downFor}s — waiting for reconnect`);
+    return;
+  }
+
+  log.error(`Gateway stuck for ${downFor}s — exiting so the supervisor restarts a clean process`);
+  clearInterval(watchdog);
+  try {
+    client.destroy();
+  } catch { /* nothing to clean up */ }
+  process.exit(1);
+}, 60_000);
+
+// Never hold the event loop open on the watchdog alone.
+watchdog.unref();
 
 // A rejected promise somewhere in a scheduler must not kill the process.
 process.on('unhandledRejection', (reason) => {
@@ -132,6 +191,7 @@ process.on('uncaughtException', (err) => {
 
 function shutdown(signal) {
   log.info(`${signal} received — shutting down`);
+  clearInterval(watchdog);
   schedulers.stopAll(tasks);
   try {
     db.db.close();

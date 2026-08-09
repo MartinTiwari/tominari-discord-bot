@@ -5,6 +5,7 @@ const config = require('../utils/config');
 const db = require('../utils/database');
 const ingest = require('../services/newsIngest');
 const publisher = require('../services/publisher');
+const summarizer = require('../services/summarizer');
 const embeds = require('../utils/embedFormatter');
 const classifier = require('../utils/categoryClassifier');
 const { formatDateTime } = require('../utils/time');
@@ -35,11 +36,18 @@ async function publishBrief(client, opts) {
       continue;
     }
 
-    const stories = ingest.selectForBrief(category, perCategory);
-    if (!stories.length) {
+    const picked = ingest.selectForBrief(category, perCategory);
+    if (!picked.length) {
       log.debug(`No stories for ${category}`);
       continue;
     }
+
+    // The brief is the long-form post of the day, so every story gets read
+    // properly here even if it was stored with only a feed teaser. It is a
+    // handful of requests per category, twice a day.
+    const stories = config.news.fetchArticleBodies
+      ? await enrichForBrief(picked)
+      : picked;
 
     const header = embeds.briefHeaderEmbed(category, {
       title: `${opts.title} — ${classifier.meta(category).label}`,
@@ -85,6 +93,20 @@ async function publishBrief(client, opts) {
   log.info(`${opts.kind} brief: ${posted} stories across ${categories} categories`
     + (skipped.length ? ` (skipped unconfigured: ${skipped.join(', ')})` : ''));
   return { posted, categories, skipped };
+}
+
+/**
+ * Read each story's article page and put the resulting summary where
+ * `newsArticleEmbed` looks for it (`content`), leaving the row untouched.
+ */
+async function enrichForBrief(stories) {
+  const enriched = await summarizer.enrich(stories, {
+    maxChars: config.news.briefSummaryLength,
+    concurrency: 3,
+  });
+  return enriched.map((s) => (
+    s.summary_origin === 'body' ? { ...s, content: s.summary } : s
+  ));
 }
 
 /** Human-readable date used in brief headers. */

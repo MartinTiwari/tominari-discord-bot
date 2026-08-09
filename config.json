@@ -21,10 +21,12 @@
   },
   "news": {
     "storiesPerCategory": 3,
-    "socialSummaryLength": 150,
-    "briefSummaryLength": 320,
+    "socialSummaryLength": 450,
+    "briefSummaryLength": 700,
     "maxSocialPostsPerCycle": 8,
-    "maxAgeHours": 24
+    "maxAgeHours": 24,
+    "summaryMaxChars": 700,
+    "fetchArticleBodies": true
   },
   "health": {
     "defaultLanguage": "nepali",
@@ -52,44 +54,52 @@
       "premier": {
         "name": "Premier League",
         "apiId": 39,
-        "emoji": "🏴"
+        "emoji": "🏴",
+        "sportsdbId": 4328
       },
       "laliga": {
         "name": "La Liga",
         "apiId": 140,
-        "emoji": "🇪🇸"
+        "emoji": "🇪🇸",
+        "sportsdbId": 4335
       },
       "bundesliga": {
         "name": "Bundesliga",
         "apiId": 78,
-        "emoji": "🇩🇪"
+        "emoji": "🇩🇪",
+        "sportsdbId": 4331
       },
       "seriea": {
         "name": "Serie A",
         "apiId": 135,
-        "emoji": "🇮🇹"
+        "emoji": "🇮🇹",
+        "sportsdbId": 4332
       },
       "ucl": {
         "name": "UEFA Champions League",
         "apiId": 2,
-        "emoji": "🏆"
+        "emoji": "🏆",
+        "sportsdbId": 4480
       }
     },
     "teams": {
       "bayern": {
         "name": "Bayern Munich",
         "apiId": 157,
-        "league": "bundesliga"
+        "league": "bundesliga",
+        "sportsdbId": 133664
       },
       "barca": {
         "name": "Barcelona",
         "apiId": 529,
-        "league": "laliga"
+        "league": "laliga",
+        "sportsdbId": 133739
       },
       "realmadrid": {
         "name": "Real Madrid",
         "apiId": 541,
-        "league": "laliga"
+        "league": "laliga",
+        "sportsdbId": 133738
       }
     }
   },
@@ -103,5 +113,10 @@
     "social": 16750848,
     "health": 10038562,
     "error": 15158332
+  },
+  "ronb": {
+    "roastNonNews": true,
+    "maxRoastsPerCycle": 3,
+    "pollLimit": 12
   }
 }

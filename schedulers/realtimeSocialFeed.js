@@ -7,6 +7,7 @@ const db = require('../utils/database');
 const ingest = require('../services/newsIngest');
 const publisher = require('../services/publisher');
 const embeds = require('../utils/embedFormatter');
+const roasts = require('../data/ronbRoasts.json');
 const { sleep } = require('../utils/http');
 
 /**
@@ -30,26 +31,40 @@ async function run(client) {
     return { seen: result.socialSeen, stored: result.socialStored, posted: 0, errors: result.errors };
   }
 
+  // Filler gets roasted, not reported — but a page having a birthday-heavy day
+  // must not crowd real news out of the cycle, so roasts are capped separately.
+  const news = result.newPosts.filter((p) => p.post_kind === 'news');
+  const filler = config.ronb?.roastNonNews === false
+    ? []
+    : result.newPosts
+      .filter((p) => p.post_kind !== 'news')
+      .slice(0, config.ronb?.maxRoastsPerCycle ?? 3);
+
   // Newest last so the channel reads chronologically top-to-bottom.
-  const batch = result.newPosts
-    .slice(0, config.news.maxSocialPostsPerCycle)
+  const batch = [...news.slice(0, config.news.maxSocialPostsPerCycle), ...filler]
     .sort((a, b) => String(a.posted_at || '').localeCompare(String(b.posted_at || '')));
 
   let posted = 0;
+  let roasted = 0;
   for (const post of batch) {
-    const message = await publisher.sendOne(
-      client,
-      'social-feed',
-      embeds.socialPostEmbed(post, post.source_name),
-    );
+    const isFiller = post.post_kind !== 'news';
+    const embed = isFiller
+      ? embeds.roastEmbed(post, roasts)
+      : embeds.socialPostEmbed(post, post.source_name);
+
+    const message = await publisher.sendOne(client, 'social-feed', embed);
     if (!message) break;                       // channel unreachable — stop early
     db.markSocialPostSent(post.id, message.channelId, message.id);
     posted++;
+    if (isFiller) roasted++;
     await sleep(750);
   }
 
-  log.info(`Cycle done: ${result.socialSeen} seen, ${result.socialStored} new, ${posted} posted`);
-  return { seen: result.socialSeen, stored: result.socialStored, posted, errors: result.errors };
+  log.info(`Cycle done: ${result.socialSeen} seen, ${result.socialStored} new,`
+    + ` ${posted} posted (${roasted} roasted)`);
+  return {
+    seen: result.socialSeen, stored: result.socialStored, posted, roasted, errors: result.errors,
+  };
 }
 
 function start(client) {
