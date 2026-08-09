@@ -103,9 +103,12 @@ async function main() {
   // news jobs post nothing — silently, with a successful exit code.
   ingest.seedSources();
 
-  log.info('Refreshing sources before posting…');
-  const result = await ingest.refreshAll();
-  log.info(`${result.socialStored} new social posts, ${result.apiStored} API articles`);
+  // Deliberately NO refreshAll() here. The feed and brief jobs each refresh as
+  // their first step and post whatever that refresh returned as new. A refresh
+  // at this point would claim every pending story as "already stored", leaving
+  // the job's own refresh with only the handful that arrived in the seconds
+  // in between — so the run would quietly post three stories and swallow the
+  // other fifty-five. Jobs that need fresh data fetch it themselves.
 
   let total = 0;
 

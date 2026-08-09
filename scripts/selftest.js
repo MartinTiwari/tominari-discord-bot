@@ -172,22 +172,25 @@ async function main() {
     return 'user toggle survives restart';
   });
 
-  check('postnow seeds sources before it ingests', () => {
-    // A CI run starts with an empty database and no ready event to seed it.
-    // When postnow skipped seeding, refreshAll() polled zero sources and every
-    // news job posted nothing — while still exiting 0, so the workflow went
-    // green and nobody noticed for 20 runs. Cheap static guard against that.
+  check('postnow seeds sources and leaves ingestion to the jobs', () => {
+    // Two bugs this locks down, both of which exited 0 and looked healthy:
+    //
+    //  1. No seeding. A CI database starts empty and there is no ready event
+    //     to seed it, so every source table was empty and the news jobs posted
+    //     nothing across twenty green runs.
+    //  2. An upfront refreshAll(). Each job refreshes as its first step and
+    //     posts what that refresh returned as new — so refreshing beforehand
+    //     consumed the backlog and left the job posting three of fifty-eight.
+    //
+    // Matching qualified calls, since the comments nearby name both functions.
     const src = require('fs').readFileSync(
       require('path').join(__dirname, 'postnow.js'), 'utf8',
     );
-    // Match the qualified call, not a bare mention — prose in the comments
-    // above these lines names both functions.
-    const seedAt = src.indexOf('ingest.seedSources(');
-    const refreshAt = src.indexOf('ingest.refreshAll(');
-    assert(seedAt !== -1, 'postnow.js no longer calls ingest.seedSources()');
-    assert(refreshAt !== -1, 'postnow.js no longer calls ingest.refreshAll()');
-    assert(seedAt < refreshAt, 'postnow.js seeds sources after ingesting, which is too late');
-    return 'seeds before ingest';
+    assert(src.includes('ingest.seedSources('),
+      'postnow.js no longer seeds sources — CI runs will poll nothing');
+    assert(!src.includes('ingest.refreshAll('),
+      'postnow.js refreshes upfront again — that steals the backlog from the jobs');
+    return 'seeds, does not pre-ingest';
   });
 
   check('a source removed from the file stops being polled', () => {
