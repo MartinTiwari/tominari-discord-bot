@@ -76,7 +76,16 @@ jobs:
         env:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
+          # Optional: sports are live without a key via TheSportsDB.
           SPORTS_API_KEY: ${{ secrets.SPORTS_API_KEY }}
+          SPORTSDB_KEY: ${{ secrets.SPORTSDB_KEY }}
+          # RONB routes. All optional — unset ones are simply skipped, and the
+          # feed falls back to the newspaper sources. See .env.example.
+          RONB_FB_FEED: ${{ secrets.RONB_FB_FEED }}
+          RONB_IG_FEED: ${{ secrets.RONB_IG_FEED }}
+          FB_PAGE_ACCESS_TOKEN: ${{ secrets.FB_PAGE_ACCESS_TOKEN }}
+          RONB_FB_PAGE_ID: ${{ secrets.RONB_FB_PAGE_ID }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
           DB_PATH: data/tominari.db
           LOG_LEVEL: info
         run: node scripts/postnow.js ${{ steps.which.outputs.jobs }}

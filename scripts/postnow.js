@@ -119,8 +119,16 @@ async function main() {
     total += r.posted;
   }
   if (wants('sports')) {
-    const r = await require('../schedulers/sportsPulse').run(client, 'evening');
-    log.info(`sports pulse → ${r.posted} embeds`);
+    // The 09:00 NPT run should look ahead to today's fixtures; the 19:00 one
+    // should report results. CI has no idea which cron fired it, so decide
+    // from the Kathmandu wall clock.
+    const hour = Number(new Date().toLocaleString('en-GB', {
+      timeZone: config.timezone, hour: '2-digit', hour12: false,
+    }));
+    const slot = hour < 12 ? 'morning' : 'evening';
+
+    const r = await require('../schedulers/sportsPulse').run(client, slot);
+    log.info(`sports pulse (${slot}) → ${r.posted} embeds`);
     total += r.posted;
   }
   if (wants('health')) {
