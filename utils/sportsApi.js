@@ -87,7 +87,24 @@ function resolveLeague(input) {
     la: 'laliga', spain: 'laliga', liga: 'laliga',
     germany: 'bundesliga', bundes: 'bundesliga',
     italy: 'seriea', serie: 'seriea',
-    championsleague: 'ucl', champions: 'ucl',
+    france: 'ligue1', ligueone: 'ligue1', frenchleague: 'ligue1',
+    championsleague: 'ucl', champions: 'ucl', cl: 'ucl',
+    europaleague: 'uel', europa: 'uel',
+    conferenceleague: 'uecl', conference: 'uecl',
+    fifaworldcup: 'worldcup', wc: 'worldcup', world: 'worldcup',
+    eurocup: 'euro', euros: 'euro', europeanchampionship: 'euro',
+    copa: 'copaamerica', america: 'copaamerica',
+    netherlands: 'eredivisie', holland: 'eredivisie', dutch: 'eredivisie',
+    portugal: 'primeira', portuguese: 'primeira',
+    turkey: 'superlig', turkish: 'superlig',
+    belgium: 'proleague', belgian: 'proleague',
+    scotland: 'scottish',
+    usa: 'mls', america_us: 'mls',
+    mexico: 'ligamx',
+    brazil: 'brasileirao', brasil: 'brasileirao',
+    japan: 'jleague', j1: 'jleague',
+    korea: 'kleague',
+    saudiproleague: 'saudi',
   };
   if (aliases[key]) return { key: aliases[key], ...leagues[aliases[key]] };
 
@@ -214,6 +231,174 @@ async function getRecentResults(teamKey, count = 5) {
   };
 }
 
+/**
+ * Every competition in `config.sports.leagues`, biggest first.
+ * @param {{maxTier?: number}} [opts]
+ */
+function trackedLeagues({ maxTier = 99 } = {}) {
+  return Object.entries(config.sports.leagues || {})
+    .map(([key, league]) => ({ key, tier: league.tier ?? 2, ...league }))
+    .filter((l) => l.tier <= maxTier)
+    .sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name));
+}
+
+/** Reverse index from API-Football's league id to our own key. */
+function leagueByApiId() {
+  const byId = new Map();
+  for (const l of trackedLeagues()) if (l.apiId) byId.set(l.apiId, l);
+  return byId;
+}
+
+/** Shared match shape, so the scoreboard renders the same from either source. */
+function fromApiFootball(f, league) {
+  const short = f.fixture?.status?.short || null;
+  const elapsed = f.fixture?.status?.elapsed ?? null;
+  const finished = ['FT', 'AET', 'PEN'].includes(short);
+  const live = ['1H', '2H', 'HT', 'ET', 'BT', 'P', 'LIVE'].includes(short);
+  const scored = f.goals?.home !== null && f.goals?.home !== undefined;
+
+  return {
+    home: f.teams?.home?.name || '—',
+    away: f.teams?.away?.name || '—',
+    homeScore: f.goals?.home ?? 0,
+    awayScore: f.goals?.away ?? 0,
+    score: scored ? `${f.goals.home} : ${f.goals.away}` : null,
+    minute: live && elapsed ? `${elapsed}'` : null,
+    status: short === 'HT' ? 'Half time' : (f.fixture?.status?.long || short || ''),
+    state: finished ? 'finished' : (live ? 'live' : 'scheduled'),
+    competition: league?.name || f.league?.name || null,
+    leagueKey: league?.key || null,
+    tier: league?.tier ?? 99,
+    emoji: league?.emoji || '⚽',
+    venue: f.fixture?.venue?.name || null,
+    timestamp: f.fixture?.date || null,
+    date: f.fixture?.date ? formatDateTime(f.fixture.date) : null,
+  };
+}
+
+/**
+ * Matches in progress right now across every tracked competition.
+ *
+ * API-Football answers this in one call when a key is present; otherwise
+ * TheSportsDB's live endpoint carries it, which is the only rich thing the
+ * keyless tier gives us.
+ */
+async function getLiveMatches({ all = false } = {}) {
+  if (isConfigured()) {
+    try {
+      const json = await cachedGet(`${BASE}/fixtures?live=all`);
+      const byId = leagueByApiId();
+      const rows = (json?.response || [])
+        .map((f) => fromApiFootball(f, byId.get(f.league?.id)))
+        .filter((m) => all || m.leagueKey);
+
+      rows.sort((a, b) => a.tier - b.tier
+        || (parseInt(b.minute, 10) || 0) - (parseInt(a.minute, 10) || 0));
+
+      if (rows.length) {
+        return { data: rows, live: true, note: 'live via API-Football', totalWorldwide: rows.length };
+      }
+    } catch (err) {
+      log.warn(`Live scores failed via API-Football: ${err.message}`);
+    }
+  }
+
+  return sportsDb.getLiveMatches({ all });
+}
+
+/**
+ * The whole day's card across tracked competitions — kicked off, in progress or
+ * still to come.
+ *
+ * With a key this is one `fixtures?date=` call for the entire world, filtered
+ * down to our leagues. Without one, TheSportsDB's per-league endpoints are
+ * capped at a handful of rows each, so the keyless answer is thin by nature and
+ * says so in `note`.
+ *
+ * @param {string} [date] ISO `YYYY-MM-DD`; defaults to today in config.timezone.
+ */
+async function getMatchesForDate(date) {
+  const day = date || new Date().toLocaleDateString('en-CA', { timeZone: config.timezone });
+
+  if (isConfigured()) {
+    try {
+      const json = await cachedGet(`${BASE}/fixtures?date=${day}`);
+      const byId = leagueByApiId();
+      const rows = (json?.response || [])
+        .filter((f) => byId.has(f.league?.id))
+        .map((f) => fromApiFootball(f, byId.get(f.league.id)));
+
+      if (rows.length) {
+        rows.sort((a, b) => a.tier - b.tier
+          || String(a.timestamp).localeCompare(String(b.timestamp)));
+        return { data: rows, live: true, note: `${day} • live via API-Football`, partial: false };
+      }
+      return { data: [], live: true, note: `No matches scheduled in tracked competitions on ${day}.`, partial: false };
+    } catch (err) {
+      log.warn(`Fixtures for ${day} failed via API-Football: ${err.message}`);
+    }
+  }
+
+  // Keyless: ask each competition separately and keep what lands on the day.
+  // Every league costs two rate-limited requests, so the fan-out is capped —
+  // but not tightly, because the leagues playing through a European summer are
+  // the second-tier ones and slicing to the elite few empties the card in
+  // exactly the weeks it is most needed.
+  const leagues = trackedLeagues()
+    .filter((l) => l.sportsdbId)
+    .slice(0, config.sports.maxKeylessLeagues ?? 18);
+  const batches = await Promise.all(leagues.map(async (league) => {
+    const [next, past] = await Promise.all([
+      sportsDb.getLeagueUpcoming(league.key, 5),
+      sportsDb.getLeagueResults(league.key, 5),
+    ]);
+    return [...past.data, ...next.data]
+      .filter((e) => e.timestamp && String(e.timestamp).slice(0, 10) === day)
+      .map((e) => ({
+        ...e,
+        state: e.score ? 'finished' : 'scheduled',
+        minute: null,
+        leagueKey: league.key,
+        tier: league.tier ?? 2,
+        emoji: league.emoji || '⚽',
+        // Our own name, not the provider's ("J1 League", not "Japanese J1
+        // League"), so a competition reads the same in every section.
+        competition: league.name,
+      }));
+  }));
+
+  // The archive endpoint lists a match as soon as it kicks off, score and all,
+  // which would print a 0:0 seven minutes in as though it had finished. The
+  // live board is the authority on anything still being played, so it wins.
+  const rows = await withLiveState(batches.flat())
+    .then((list) => list.sort((a, b) => a.tier - b.tier
+      || String(a.timestamp).localeCompare(String(b.timestamp))));
+
+  return {
+    data: rows,
+    live: rows.length > 0,
+    note: `${day} • via TheSportsDB`,
+    partial: true,
+  };
+}
+
+/** Overlay the live scoreboard onto a day's card, matched on the two teams. */
+async function withLiveState(matches) {
+  if (!matches.length) return matches;
+
+  const live = await sportsDb.getLiveMatches({ all: true });
+  if (!live.data.length) return matches;
+
+  const key = (m) => `${m.home}|${m.away}`.toLowerCase();
+  const inPlay = new Map(live.data.map((m) => [key(m), m]));
+
+  return matches.map((m) => {
+    const now = inPlay.get(key(m));
+    if (!now) return m;
+    return { ...m, score: now.score, minute: now.minute, status: now.status, state: 'live' };
+  });
+}
+
 /** Matches played or in progress today for a team. */
 async function getTodayFixtures(teamKey) {
   const team = resolveTeam(teamKey);
@@ -248,6 +433,9 @@ module.exports = {
   getUpcomingFixtures,
   getRecentResults,
   getTodayFixtures,
+  getLiveMatches,
+  getMatchesForDate,
+  trackedLeagues,
   resolveTeam,
   resolveLeague,
   isConfigured,

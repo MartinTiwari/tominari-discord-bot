@@ -6,12 +6,19 @@ const config = require('../utils/config');
 const sportsApi = require('../utils/sportsApi');
 const publisher = require('../services/publisher');
 const embeds = require('../utils/embedFormatter');
-const { formatDateTime } = require('../utils/time');
 
 /**
- * Twice-daily sports post: fixtures in the morning, results plus a standings
- * snapshot in the evening. Runs against the configured default teams
- * (Bayern / Barça / Real Madrid) — user favourites are served by /today-matches.
+ * Twice-daily sports post, built around the competitions rather than around a
+ * short list of clubs:
+ *
+ *   1. anything being played right now, worldwide, with the clock
+ *   2. the day's card across every tracked competition
+ *   3. the favourite clubs' own fixtures and results
+ *   4. a league table in the evening
+ *
+ * Competitions come from `config.sports.leagues` — the big five, the European
+ * cups, the World Cup and Euros, and the leading leagues from the Americas and
+ * Asia. Sections that have nothing to say are dropped rather than posted empty.
  */
 
 /**
@@ -24,28 +31,33 @@ async function run(client, slot = 'morning') {
     return { posted: 0 };
   }
 
-  const teamKeys = Object.keys(config.sports.teams);
   const cards = [];
 
-  // Today's matches (kick-off times in the morning, scores in the evening).
-  const todayResults = await Promise.all(teamKeys.map((k) => sportsApi.getTodayFixtures(k)));
-  const todayFixtures = todayResults.flatMap((r) => r.data);
-
-  if (todayFixtures.length) {
-    const lines = todayFixtures.map((f) => {
-      const score = f.score && !f.score.includes('-') ? ` **${f.score}**` : '';
-      return { name: `${f.home} vs ${f.away}${score}`, value: `📅 ${f.date}${f.competition ? `\n🏆 ${f.competition}` : ''}${f.status ? `\n📊 ${f.status}` : ''}` };
-    });
-    const { EmbedBuilder } = require('discord.js');
-    cards.push(new EmbedBuilder()
-      .setColor(config.colorFor('sports'))
-      .setTitle(slot === 'evening' ? '⚽ Today’s results' : '⚽ Today’s fixtures')
-      .addFields(lines.slice(0, 10))
-      .setFooter({ text: `Tominari • ${formatDateTime()}` }));
+  // 1. Live scoreboard. This is the only rich source available without an API
+  //    key, so it leads whenever anything is actually in play.
+  const live = await sportsApi.getLiveMatches();
+  if (live.data.length) {
+    cards.push(embeds.liveScoreEmbed(live.data.slice(0, config.sports.maxLiveMatches ?? 12), {
+      note: live.note,
+    }));
   }
 
-  // Morning looks ahead; evening looks back at what was actually played.
-  for (const key of teamKeys) {
+  // 2. The whole day's card. Matches already played show their score, the rest
+  //    show kick-off in Kathmandu time.
+  const today = await sportsApi.getMatchesForDate();
+  if (today.data.length) {
+    cards.push(embeds.matchdayEmbed(today.data, {
+      title: slot === 'evening' ? "⚽ Today's results" : "⚽ Today's matches",
+      perCompetition: config.sports.maxMatchesPerCompetition ?? 6,
+      note: today.partial
+        ? `${today.note} — add SPORTS_API_KEY for the full worldwide card`
+        : today.note,
+    }));
+  }
+
+  // 3. The clubs the server actually follows, so the regulars still get their
+  //    own card even on a quiet matchday.
+  for (const key of Object.keys(config.sports.teams)) {
     const team = sportsApi.resolveTeam(key);
 
     if (slot === 'evening') {
@@ -61,12 +73,17 @@ async function run(client, slot = 'morning') {
     if (data.length) cards.push(embeds.fixtureEmbed(team.name, data, { note }));
   }
 
-  // Evening slot also drops a league table.
+  // 4. Evening slot closes with a table, rotating through the top divisions so
+  //    it is not the same league every night.
   if (slot !== 'morning') {
-    const league = sportsApi.resolveLeague('bundesliga');
-    const { data, note } = await sportsApi.getStandings('bundesliga');
-    if (data.length) {
-      cards.push(embeds.standingsEmbed(league.name, data.slice(0, 10), { emoji: league.emoji, note }));
+    const league = pickTableLeague();
+    if (league) {
+      const { data, note } = await sportsApi.getStandings(league.key);
+      if (data.length) {
+        cards.push(embeds.standingsEmbed(league.name, data.slice(0, 10), {
+          emoji: league.emoji, note,
+        }));
+      }
     }
   }
 
@@ -76,10 +93,29 @@ async function run(client, slot = 'morning') {
   }
 
   const header = slot === 'evening' ? '## ⚽ Evening Sports Pulse' : '## ⚽ Morning Sports Pulse';
-  await publisher.sendToCategory(client, 'sports', cards, { content: header });
+  // Ten embeds per message is Discord's ceiling; publisher chunks past that.
+  await publisher.sendToCategory(client, 'sports', cards.slice(0, 10), { content: header });
 
-  log.info(`${slot} pulse: ${cards.length} embeds posted`);
+  log.info(`${slot} pulse: ${cards.length} embeds posted`
+    + ` (${live.data.length} live, ${today.data.length} today)`);
   return { posted: cards.length };
+}
+
+/**
+ * One of the domestic top divisions, chosen from the date so the table rotates
+ * daily. Continental and international competitions are skipped — a group-stage
+ * table is meaningless for most of the year.
+ */
+function pickTableLeague() {
+  const DOMESTIC = ['premier', 'laliga', 'bundesliga', 'seriea', 'ligue1'];
+  const leagues = sportsApi.trackedLeagues({ maxTier: 1 })
+    .filter((l) => DOMESTIC.includes(l.key));
+  if (!leagues.length) return null;
+
+  const dayOfYear = Math.floor(
+    (Date.now() - Date.UTC(new Date().getUTCFullYear(), 0, 0)) / 86_400_000,
+  );
+  return leagues[dayOfYear % leagues.length];
 }
 
 function start(client) {

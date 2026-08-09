@@ -6,7 +6,12 @@ const sportsApi = require('../utils/sportsApi');
 const embeds = require('../utils/embedFormatter');
 const config = require('../utils/config');
 
+// Discord allows at most 25 choices per option and we track more competitions
+// than that, so the picker shows the biggest ones — `resolveLeague` still
+// accepts anything typed by hand, including team names.
 const LEAGUE_CHOICES = Object.entries(config.sports.leagues)
+  .sort(([, a], [, b]) => (a.tier ?? 2) - (b.tier ?? 2) || a.name.localeCompare(b.name))
+  .slice(0, 25)
   .map(([value, l]) => ({ name: `${l.emoji} ${l.name}`, value }));
 
 const TEAM_CHOICES = Object.entries(config.sports.teams)
@@ -28,7 +33,7 @@ const standings = {
 
     if (!league) {
       return interaction.editReply({
-        embeds: [embeds.errorEmbed('Unknown league', `I don't track \`${input}\`. Try premier, laliga, bundesliga, seriea or ucl.`)],
+        embeds: [embeds.errorEmbed('Unknown league', `I don't track \`${input}\`. Try premier, laliga, bundesliga, seriea, ligue1 or ucl.`)],
       });
     }
 
@@ -178,4 +183,65 @@ const today = {
   },
 };
 
-module.exports = [standings, nextMatch, addFavorite, removeFavorite, myFavorites, today];
+const live = {
+  data: new SlashCommandBuilder()
+    .setName('live')
+    .setDescription('Live scores from the top leagues right now')
+    .addBooleanOption((o) => o
+      .setName('worldwide')
+      .setDescription('Include every competition, not just the tracked ones')
+      .setRequired(false)),
+  async execute(interaction) {
+    await interaction.deferReply();
+    const all = interaction.options.getBoolean('worldwide') ?? false;
+    const { data, note, totalWorldwide } = await sportsApi.getLiveMatches({ all });
+
+    if (!data.length) {
+      const extra = totalWorldwide
+        ? ` ${totalWorldwide} match${totalWorldwide === 1 ? ' is' : 'es are'} live elsewhere — try \`/live worldwide:true\`.`
+        : '';
+      return interaction.editReply(`📭 Nothing in play in the tracked competitions right now.${extra}`);
+    }
+
+    await interaction.editReply({
+      embeds: [embeds.liveScoreEmbed(data.slice(0, 20), {
+        note,
+        title: all ? '🔴 Live now — worldwide' : '🔴 Live now',
+      })],
+    });
+  },
+};
+
+const matches = {
+  data: new SlashCommandBuilder()
+    .setName('matches')
+    .setDescription("Today's card across the top leagues")
+    .addStringOption((o) => o
+      .setName('date')
+      .setDescription('YYYY-MM-DD (defaults to today)')
+      .setRequired(false)),
+  async execute(interaction) {
+    await interaction.deferReply();
+    const date = interaction.options.getString('date');
+
+    if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return interaction.editReply({
+        embeds: [embeds.errorEmbed('Bad date', 'Use `YYYY-MM-DD`, for example `2026-08-22`.')],
+      });
+    }
+
+    const { data, note, partial } = await sportsApi.getMatchesForDate(date);
+    if (!data.length) {
+      return interaction.editReply(`📭 No matches in the tracked competitions${date ? ` on ${date}` : ' today'}.`);
+    }
+
+    await interaction.editReply({
+      embeds: [embeds.matchdayEmbed(data, {
+        title: date ? `⚽ Matches on ${date}` : "⚽ Today's matches",
+        note: partial ? `${note} — add SPORTS_API_KEY for the full worldwide card` : note,
+      })],
+    });
+  },
+};
+
+module.exports = [standings, nextMatch, addFavorite, removeFavorite, myFavorites, today, live, matches];

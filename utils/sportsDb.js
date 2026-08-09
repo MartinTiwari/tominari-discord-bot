@@ -26,11 +26,48 @@ const BASE = `https://www.thesportsdb.com/api/v1/json/${KEY}`;
 const cache = new Map();
 const TTL_MS = 30 * 60 * 1000;
 
-async function cachedGet(path) {
-  const hit = cache.get(path);
-  if (hit && Date.now() - hit.at < TTL_MS) return hit.value;
+// A scoreboard that is half an hour stale is not a scoreboard, so the live
+// endpoint gets its own short window.
+const LIVE_TTL_MS = 60 * 1000;
 
-  const value = await getJson(`${BASE}${path}`, { retries: 1, timeout: 15_000 });
+/**
+ * The public key rate-limits hard — roughly half a dozen calls a second earns a
+ * 429 for the next few minutes, and the day card asks one question per
+ * competition. Requests are therefore serialised with a gap between them;
+ * cache hits skip the queue entirely.
+ */
+// The documented ceiling on the public key is 30 requests a minute, and going
+// over earns a 429 for several minutes — long enough to empty a whole post.
+const MIN_INTERVAL_MS = 2_200;
+let queue = Promise.resolve();
+let lastCallAt = 0;
+
+function paced(fn) {
+  const run = queue.then(async () => {
+    const wait = MIN_INTERVAL_MS - (Date.now() - lastCallAt);
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    lastCallAt = Date.now();
+    return fn();
+  });
+  // Keep the chain alive even when one call rejects.
+  queue = run.catch(() => {});
+  return run;
+}
+
+async function cachedGet(path, ttl = TTL_MS) {
+  const hit = cache.get(path);
+  if (hit && Date.now() - hit.at < ttl) return hit.value;
+
+  const value = await paced(() => getJson(`${BASE}${path}`, { retries: 1, timeout: 15_000 }))
+    .catch((err) => {
+      // Callers swallow their own errors, so without this the whole sports post
+      // would quietly come back empty with nothing in the log to explain it.
+      if (/\b429\b|too many/i.test(err.message)) {
+        log.warn('Rate limited by TheSportsDB — sports sections will be thin for a few minutes');
+      }
+      throw err;
+    });
+
   cache.set(path, { at: Date.now(), value });
   return value;
 }
@@ -114,9 +151,12 @@ async function getStandings(key) {
     try {
       const json = await cachedGet(`/lookuptable.php?l=${id}&s=${s}`);
       const table = Array.isArray(json?.table) ? json.table : [];
-      // A brand-new season has a stub table for a week or two; fall back to the
-      // completed one rather than posting a three-row league.
-      if (table.length >= 6 || (table.length && i === attempts.length - 1)) {
+      // A season that has not kicked off yet still answers with a full table of
+      // zeroes. Row count cannot tell that apart from a real one — the public
+      // key truncates every list to five rows either way — so the test is
+      // whether anyone has actually played, and if not we show last season.
+      const played = table.some((r) => (Number(r.intPlayed) || 0) > 0);
+      if ((table.length && played) || (table.length && i === attempts.length - 1)) {
         return {
           data: table.map(normalizeRow).sort((a, b) => a.position - b.position),
           live: true,
@@ -195,6 +235,114 @@ async function getRecentResults(key, count = 5) {
 }
 
 /**
+ * Reverse index from TheSportsDB's league id to our own key, so a match that
+ * arrives from the worldwide live feed can be recognised as one of the
+ * competitions we track. Rebuilt on demand — config is read from disk once.
+ */
+function trackedLeaguesById() {
+  const byId = new Map();
+  for (const [key, league] of Object.entries(config.sports.leagues || {})) {
+    const id = league.sportsdbId || LEAGUE_IDS[key];
+    if (id) byId.set(String(id), { key, ...league });
+  }
+  return byId;
+}
+
+/** Codes that mean the ball is currently rolling. */
+const IN_PLAY = new Set(['1H', '2H', 'HT', 'ET', 'BT', 'P', 'PEN', 'LIVE']);
+
+/**
+ * Every match kicking about right now, worldwide, narrowed to the competitions
+ * in `config.sports.leagues`.
+ *
+ * This is the one list TheSportsDB serves in full without a key — every other
+ * endpoint truncates to about five rows on the public test key — so the live
+ * scoreboard is the part of the sports post that works out of the box.
+ *
+ * @param {{all?: boolean}} [opts] `all: true` skips the tracked-league filter.
+ * @returns {Promise<{data:Array, live:boolean, note:string|null, totalWorldwide:number}>}
+ */
+async function getLiveMatches({ all = false } = {}) {
+  try {
+    const json = await cachedGet('/livescore.php?s=Soccer', LIVE_TTL_MS);
+    const rows = json?.events || json?.livescore || [];
+    const byId = trackedLeaguesById();
+
+    const matches = rows.map((e) => {
+      const league = byId.get(String(e.idLeague));
+      const raw = String(e.strStatus ?? '').trim().toUpperCase();
+      const minute = String(e.strProgress ?? '').trim();
+
+      return {
+        home: e.strHomeTeam || '—',
+        away: e.strAwayTeam || '—',
+        homeScore: Number(e.intHomeScore ?? 0) || 0,
+        awayScore: Number(e.intAwayScore ?? 0) || 0,
+        score: `${e.intHomeScore ?? 0} : ${e.intAwayScore ?? 0}`,
+        minute: minute && minute !== '0' ? `${minute}'` : null,
+        status: raw === 'HT' ? 'Half time' : (raw || 'Live'),
+        state: raw === 'FT' ? 'finished' : 'live',
+        competition: league?.name || e.strLeague || null,
+        leagueKey: league?.key || null,
+        tier: league?.tier ?? 99,
+        emoji: league?.emoji || '⚽',
+        timestamp: e.strTimestamp || null,
+        date: e.strTimestamp ? formatDateTime(e.strTimestamp) : (e.strEventTime || null),
+      };
+    }).filter((m) => IN_PLAY.has(String(m.status).toUpperCase()) || m.state === 'live');
+
+    const tracked = all ? matches : matches.filter((m) => m.leagueKey);
+
+    // Biggest competition first, then whoever is furthest into the match.
+    tracked.sort((a, b) => a.tier - b.tier
+      || (parseInt(b.minute, 10) || 0) - (parseInt(a.minute, 10) || 0));
+
+    return {
+      data: tracked,
+      live: tracked.length > 0,
+      note: tracked.length ? 'live via TheSportsDB' : null,
+      totalWorldwide: matches.length,
+    };
+  } catch (err) {
+    log.debug(`Live scores failed: ${err.message}`);
+    return { data: [], live: false, note: null, totalWorldwide: 0 };
+  }
+}
+
+/**
+ * Next fixtures in a competition. The public key truncates this hard (often to
+ * a single row), so treat whatever comes back as a taster, not a full matchday.
+ */
+async function getLeagueUpcoming(key, count = 5) {
+  const id = leagueId(key);
+  if (!id) return { data: [], live: false, note: null };
+
+  try {
+    const json = await cachedGet(`/eventsnextleague.php?id=${id}`);
+    const events = (json?.events || []).slice(0, count).map(normalizeEvent);
+    return { data: events, live: events.length > 0, note: events.length ? 'via TheSportsDB' : null };
+  } catch (err) {
+    log.debug(`League fixtures failed for ${key}: ${err.message}`);
+    return { data: [], live: false, note: null };
+  }
+}
+
+/** Most recent results in a competition. Same truncation caveat as above. */
+async function getLeagueResults(key, count = 5) {
+  const id = leagueId(key);
+  if (!id) return { data: [], live: false, note: null };
+
+  try {
+    const json = await cachedGet(`/eventspastleague.php?id=${id}`);
+    const events = (json?.events || []).slice(0, count).map(normalizeEvent);
+    return { data: events, live: events.length > 0, note: events.length ? 'via TheSportsDB' : null };
+  } catch (err) {
+    log.debug(`League results failed for ${key}: ${err.message}`);
+    return { data: [], live: false, note: null };
+  }
+}
+
+/**
  * Anything involving this team today — kicked off, finished or still to come.
  * Assembled from the next/last endpoints, which between them always bracket
  * today, rather than a separate per-date call.
@@ -214,6 +362,9 @@ module.exports = {
   getUpcomingFixtures,
   getRecentResults,
   getTodayFixtures,
+  getLiveMatches,
+  getLeagueUpcoming,
+  getLeagueResults,
   currentSeason,
   leagueId,
   teamId,

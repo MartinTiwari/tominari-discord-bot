@@ -549,6 +549,58 @@ async function main() {
     return data.length ? `${data.length} fixtures` : 'none scheduled (off-season)';
   });
 
+  check('every tracked competition is completely described', () => {
+    const leagues = sportsApi.trackedLeagues();
+    assert(leagues.length >= 20, `only ${leagues.length} competitions tracked`);
+    for (const l of leagues) {
+      assert(l.name && l.emoji, `${l.key} is missing a name or emoji`);
+      assert(Number.isInteger(l.apiId), `${l.key} has no API-Football id`);
+      assert([1, 2].includes(l.tier), `${l.key} has tier ${l.tier}`);
+    }
+    // Choices are capped at 25 per option, and registration fails past that.
+    const ids = leagues.map((l) => l.apiId);
+    assert(new Set(ids).size === ids.length, 'two competitions share an apiId');
+    return `${leagues.length} competitions, ${sportsApi.trackedLeagues({ maxTier: 1 }).length} elite`;
+  });
+
+  check('the league picker stays inside Discord\'s 25-choice limit', () => {
+    const commands = require('../commands/sports');
+    for (const cmd of commands) {
+      for (const opt of cmd.data.toJSON().options || []) {
+        const n = (opt.choices || []).length;
+        assert(n <= 25, `/${cmd.data.name} option "${opt.name}" offers ${n} choices`);
+      }
+    }
+    return `${commands.length} sports commands registered`;
+  });
+
+  await checkAsync('live scoreboard returns a renderable shape', async () => {
+    // Whether anything is in play depends on the hour, so this asserts the
+    // contract rather than a match count.
+    const { data, totalWorldwide } = await sportsApi.getLiveMatches();
+    assert(Array.isArray(data), 'data is not an array');
+    assert(data.every((m) => m.home && m.away), 'a live match is missing a team');
+    assert(data.every((m) => typeof m.score === 'string'), 'a live match has no score');
+    assert(data.every((m) => m.leagueKey), 'an untracked competition leaked through the filter');
+    embeds.liveScoreEmbed(data, { note: 'selftest' });
+    return data.length
+      ? `${data.length} live in tracked leagues (${totalWorldwide} worldwide)`
+      : `none in tracked leagues right now (${totalWorldwide} worldwide)`;
+  });
+
+  await checkAsync('the day\'s card builds an embed inside Discord\'s limits', async () => {
+    const { data, note } = await sportsApi.getMatchesForDate();
+    assert(Array.isArray(data), 'data is not an array');
+    assert(data.every((m) => m.competition), 'a match has no competition');
+    const json = embeds.matchdayEmbed(data, { note }).toJSON();
+    const fields = json.fields || [];
+    assert(fields.length <= 25, `${fields.length} fields exceeds the limit`);
+    for (const f of fields) {
+      assert(f.value.length <= 1024, `field "${f.name}" is ${f.value.length} chars`);
+    }
+    return `${data.length} matches across ${fields.length} competitions`;
+  });
+
   // -------------------------------------------------------- selection ----
   console.log('\nBrief selection');
   check('selectForBrief returns at most the configured count', () => {

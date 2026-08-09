@@ -50,36 +50,206 @@
       "Barcelona",
       "Real Madrid"
     ],
+    "liveRefreshMinutes": 30,
+    "maxLiveMatches": 12,
+    "maxMatchesPerCompetition": 6,
+    "maxKeylessLeagues": 12,
     "leagues": {
-      "premier": {
-        "name": "Premier League",
-        "apiId": 39,
-        "emoji": "🏴",
-        "sportsdbId": 4328
+      "worldcup": {
+        "name": "FIFA World Cup",
+        "apiId": 1,
+        "emoji": "🌍",
+        "sportsdbId": 4429,
+        "tier": 1
       },
-      "laliga": {
-        "name": "La Liga",
-        "apiId": 140,
-        "emoji": "🇪🇸",
-        "sportsdbId": 4335
-      },
-      "bundesliga": {
-        "name": "Bundesliga",
-        "apiId": 78,
-        "emoji": "🇩🇪",
-        "sportsdbId": 4331
-      },
-      "seriea": {
-        "name": "Serie A",
-        "apiId": 135,
-        "emoji": "🇮🇹",
-        "sportsdbId": 4332
+      "euro": {
+        "name": "UEFA Euro",
+        "apiId": 4,
+        "emoji": "🇪🇺",
+        "sportsdbId": 4502,
+        "tier": 1
       },
       "ucl": {
         "name": "UEFA Champions League",
         "apiId": 2,
         "emoji": "🏆",
-        "sportsdbId": 4480
+        "sportsdbId": 4480,
+        "tier": 1
+      },
+      "uel": {
+        "name": "UEFA Europa League",
+        "apiId": 3,
+        "emoji": "🥈",
+        "sportsdbId": 4481,
+        "tier": 1
+      },
+      "premier": {
+        "name": "Premier League",
+        "apiId": 39,
+        "emoji": "🏴",
+        "sportsdbId": 4328,
+        "tier": 1
+      },
+      "laliga": {
+        "name": "La Liga",
+        "apiId": 140,
+        "emoji": "🇪🇸",
+        "sportsdbId": 4335,
+        "tier": 1
+      },
+      "bundesliga": {
+        "name": "Bundesliga",
+        "apiId": 78,
+        "emoji": "🇩🇪",
+        "sportsdbId": 4331,
+        "tier": 1
+      },
+      "seriea": {
+        "name": "Serie A",
+        "apiId": 135,
+        "emoji": "🇮🇹",
+        "sportsdbId": 4332,
+        "tier": 1
+      },
+      "ligue1": {
+        "name": "Ligue 1",
+        "apiId": 61,
+        "emoji": "🇫🇷",
+        "sportsdbId": 4334,
+        "tier": 1
+      },
+      "nationsleague": {
+        "name": "UEFA Nations League",
+        "apiId": 5,
+        "emoji": "🏅",
+        "sportsdbId": null,
+        "tier": 2
+      },
+      "copaamerica": {
+        "name": "Copa América",
+        "apiId": 9,
+        "emoji": "🌎",
+        "sportsdbId": null,
+        "tier": 2
+      },
+      "afcon": {
+        "name": "Africa Cup of Nations",
+        "apiId": 6,
+        "emoji": "🌍",
+        "sportsdbId": null,
+        "tier": 2
+      },
+      "clubwc": {
+        "name": "FIFA Club World Cup",
+        "apiId": 15,
+        "emoji": "🌐",
+        "sportsdbId": null,
+        "tier": 2
+      },
+      "uecl": {
+        "name": "UEFA Conference League",
+        "apiId": 848,
+        "emoji": "🥉",
+        "sportsdbId": null,
+        "tier": 2
+      },
+      "libertadores": {
+        "name": "Copa Libertadores",
+        "apiId": 13,
+        "emoji": "🏆",
+        "sportsdbId": null,
+        "tier": 2
+      },
+      "eredivisie": {
+        "name": "Eredivisie",
+        "apiId": 88,
+        "emoji": "🇳🇱",
+        "sportsdbId": 4337,
+        "tier": 2
+      },
+      "primeira": {
+        "name": "Primeira Liga",
+        "apiId": 94,
+        "emoji": "🇵🇹",
+        "sportsdbId": 4344,
+        "tier": 2
+      },
+      "superlig": {
+        "name": "Süper Lig",
+        "apiId": 203,
+        "emoji": "🇹🇷",
+        "sportsdbId": 4339,
+        "tier": 2
+      },
+      "proleague": {
+        "name": "Belgian Pro League",
+        "apiId": 144,
+        "emoji": "🇧🇪",
+        "sportsdbId": 4338,
+        "tier": 2
+      },
+      "championship": {
+        "name": "EFL Championship",
+        "apiId": 40,
+        "emoji": "🏴",
+        "sportsdbId": 4329,
+        "tier": 2
+      },
+      "scottish": {
+        "name": "Scottish Premiership",
+        "apiId": 179,
+        "emoji": "🏴",
+        "sportsdbId": 4330,
+        "tier": 2
+      },
+      "mls": {
+        "name": "Major League Soccer",
+        "apiId": 253,
+        "emoji": "🇺🇸",
+        "sportsdbId": 4346,
+        "tier": 2
+      },
+      "ligamx": {
+        "name": "Liga MX",
+        "apiId": 262,
+        "emoji": "🇲🇽",
+        "sportsdbId": null,
+        "tier": 2
+      },
+      "brasileirao": {
+        "name": "Brasileirão Série A",
+        "apiId": 71,
+        "emoji": "🇧🇷",
+        "sportsdbId": null,
+        "tier": 2
+      },
+      "argentina": {
+        "name": "Liga Profesional Argentina",
+        "apiId": 128,
+        "emoji": "🇦🇷",
+        "sportsdbId": null,
+        "tier": 2
+      },
+      "saudi": {
+        "name": "Saudi Pro League",
+        "apiId": 307,
+        "emoji": "🇸🇦",
+        "sportsdbId": null,
+        "tier": 2
+      },
+      "jleague": {
+        "name": "J1 League",
+        "apiId": 98,
+        "emoji": "🇯🇵",
+        "sportsdbId": 4633,
+        "tier": 2
+      },
+      "kleague": {
+        "name": "K League 1",
+        "apiId": 292,
+        "emoji": "🇰🇷",
+        "sportsdbId": null,
+        "tier": 2
       }
     },
     "teams": {

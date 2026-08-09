@@ -246,6 +246,94 @@ function resultsEmbed(team, results, { note = null } = {}) {
   return embed;
 }
 
+/** `Arsenal 2 : 1 Chelsea` with the scoreline emphasised, or `vs` before kick-off. */
+function scoreLine(m) {
+  const home = truncate(m.home, 20);
+  const away = truncate(m.away, 20);
+  return m.score ? `**${home}  ${m.score}  ${away}**` : `${home} vs ${away}`;
+}
+
+/** Group matches by competition, preserving the order they arrived in. */
+function groupByCompetition(matches) {
+  const groups = new Map();
+  for (const m of matches) {
+    const label = `${m.emoji || '⚽'} ${m.competition || 'Football'}`;
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label).push(m);
+  }
+  return groups;
+}
+
+/**
+ * Live scoreboard — every tracked match currently being played, grouped by
+ * competition with the clock next to each score.
+ */
+function liveScoreEmbed(matches, { note = null, title = '🔴 Live now' } = {}) {
+  const embed = new EmbedBuilder()
+    .setColor(config.colorFor('sports'))
+    .setTitle(title)
+    .setTimestamp();
+
+  if (!matches.length) {
+    embed.setDescription('_Nothing kicking off right now in the tracked competitions._');
+    if (note) embed.setFooter({ text: note });
+    return embed;
+  }
+
+  for (const [label, group] of groupByCompetition(matches)) {
+    const lines = group.map((m) => {
+      const clock = m.minute ? ` \`${m.minute}\`` : (m.status ? ` \`${m.status}\`` : '');
+      return `${scoreLine(m)}${clock}`;
+    });
+    embed.addFields({ name: label, value: truncate(lines.join('\n'), 1000) });
+  }
+
+  if (note) embed.setFooter({ text: note });
+  return embed;
+}
+
+/**
+ * A day's card across competitions: results where they exist, kick-off times
+ * where they do not.
+ */
+function matchdayEmbed(matches, { title = "⚽ Today's matches", note = null, perCompetition = 6 } = {}) {
+  const embed = new EmbedBuilder()
+    .setColor(config.colorFor('sports'))
+    .setTitle(title)
+    .setTimestamp();
+
+  if (!matches.length) {
+    embed.setDescription('_No matches in the tracked competitions today._');
+    if (note) embed.setFooter({ text: note });
+    return embed;
+  }
+
+  // Discord allows 25 fields; one per competition keeps us far inside that.
+  for (const [label, group] of [...groupByCompetition(matches)].slice(0, 20)) {
+    const lines = group.slice(0, perCompetition).map((m) => {
+      const when = m.state === 'live'
+        ? (m.minute ? `\`${m.minute}\`` : '`LIVE`')
+        : (m.state === 'finished' ? '`FT`' : `🕐 ${kickoffTime(m)}`);
+      return `${scoreLine(m)} ${when}`;
+    });
+    if (group.length > perCompetition) lines.push(`_+${group.length - perCompetition} more_`);
+    embed.addFields({ name: label, value: truncate(lines.join('\n'), 1000) });
+  }
+
+  if (note) embed.setFooter({ text: note });
+  return embed;
+}
+
+/** Kick-off in Kathmandu time — the audience is in Nepal, not in the league's country. */
+function kickoffTime(m) {
+  if (!m.timestamp) return m.date || 'TBD';
+  const d = new Date(m.timestamp);
+  if (Number.isNaN(d.getTime())) return m.date || 'TBD';
+  return d.toLocaleTimeString('en-GB', {
+    timeZone: config.timezone, hour: '2-digit', minute: '2-digit',
+  });
+}
+
 /** Consistent red error card so failures never look like a crash to users. */
 function errorEmbed(title, detail) {
   return new EmbedBuilder()
@@ -278,6 +366,8 @@ module.exports = {
   standingsEmbed,
   fixtureEmbed,
   resultsEmbed,
+  liveScoreEmbed,
+  matchdayEmbed,
   errorEmbed,
   progressBar,
   formatCount,
