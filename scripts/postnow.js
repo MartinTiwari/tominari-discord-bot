@@ -97,6 +97,12 @@ async function main() {
   const missing = [...config.categories, 'social-feed'].filter((c) => !config.channelFor(c));
   if (missing.length) log.warn(`No channel configured for: ${missing.join(', ')} — skipping those.`);
 
+  // The long-running bot seeds on ready, but this script has no ready event,
+  // and in CI the database starts empty on the very first run. Without this
+  // there are no rows in social_sources, so refreshAll() polls nothing and the
+  // news jobs post nothing — silently, with a successful exit code.
+  ingest.seedSources();
+
   log.info('Refreshing sources before posting…');
   const result = await ingest.refreshAll();
   log.info(`${result.socialStored} new social posts, ${result.apiStored} API articles`);

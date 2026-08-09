@@ -172,6 +172,21 @@ async function main() {
     return 'user toggle survives restart';
   });
 
+  check('postnow seeds sources before it ingests', () => {
+    // A CI run starts with an empty database and no ready event to seed it.
+    // When postnow skipped seeding, refreshAll() polled zero sources and every
+    // news job posted nothing — while still exiting 0, so the workflow went
+    // green and nobody noticed for 20 runs. Cheap static guard against that.
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, 'postnow.js'), 'utf8',
+    );
+    const seedAt = src.indexOf('seedSources(');
+    const refreshAt = src.indexOf('refreshAll(');
+    assert(seedAt !== -1, 'postnow.js no longer calls seedSources()');
+    assert(seedAt < refreshAt, 'postnow.js seeds sources after ingesting, which is too late');
+    return 'seeds before ingest';
+  });
+
   check('a source removed from the file stops being polled', () => {
     db.upsertSource({ name: 'Test Retired Outlet', platform: 'rss', feed: 'https://x.invalid/rss', active: true });
     ingest.seedSources();
