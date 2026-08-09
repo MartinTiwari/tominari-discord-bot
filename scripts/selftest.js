@@ -180,9 +180,12 @@ async function main() {
     const src = require('fs').readFileSync(
       require('path').join(__dirname, 'postnow.js'), 'utf8',
     );
-    const seedAt = src.indexOf('seedSources(');
-    const refreshAt = src.indexOf('refreshAll(');
-    assert(seedAt !== -1, 'postnow.js no longer calls seedSources()');
+    // Match the qualified call, not a bare mention — prose in the comments
+    // above these lines names both functions.
+    const seedAt = src.indexOf('ingest.seedSources(');
+    const refreshAt = src.indexOf('ingest.refreshAll(');
+    assert(seedAt !== -1, 'postnow.js no longer calls ingest.seedSources()');
+    assert(refreshAt !== -1, 'postnow.js no longer calls ingest.refreshAll()');
     assert(seedAt < refreshAt, 'postnow.js seeds sources after ingesting, which is too late');
     return 'seeds before ingest';
   });
