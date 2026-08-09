@@ -12,12 +12,19 @@ name: Tominari
 # The half-hourly jobs are timezone-independent. Quiet hours for reminders are
 # enforced in code against Asia/Kathmandu, so the runner's clock does not matter.
 
+# SCHEDULE DISABLED — the bot now runs continuously on Fly.io (app
+# "tominari-bot"), which owns every cron. Re-enabling the schedule below would
+# post everything twice: the Fly instance and this workflow share no lock and
+# have separate databases, so neither would dedupe against the other.
+#
+# Re-enable only if you tear the Fly app down. Manual runs are still fine —
+# they are one-off and you control the timing.
 on:
-  schedule:
-    - cron: '*/30 * * * *'   # social feed + churot-free blast
-    - cron: '15 0 * * *'     # morning brief
-    - cron: '15 16 * * *'    # evening recap
-    - cron: '15 3,13 * * *'  # sports pulse
+  # schedule:
+  #   - cron: '*/30 * * * *'   # social feed + churot-free blast
+  #   - cron: '15 0 * * *'     # morning brief
+  #   - cron: '15 16 * * *'    # evening recap
+  #   - cron: '15 3,13 * * *'  # sports pulse
   workflow_dispatch:         # lets you fire a run by hand from the Actions tab
     inputs:
       jobs:
