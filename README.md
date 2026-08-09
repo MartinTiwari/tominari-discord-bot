@@ -60,9 +60,8 @@ Nothing here is required — news and sports are both live out of the box.
 
 - `NEWSAPI_KEY` — <https://newsapi.org>, free tier 100 req/day. Without it the
   bot runs on RSS feeds alone.
-- `SPORTS_API_KEY` — RapidAPI [API-Football](https://rapidapi.com/api-sports/api/api-football).
-  Sports already run live through TheSportsDB, which needs no key; add this one
-  only if you want full 18/20-team tables instead of the top 5.
+- **Sports needs no key at all.** Football, basketball and cricket come from
+  ESPN's public API — full league tables, live clocks, no quota, no signup.
 - **RONB access** — see [Reading RONB](#reading-ronb) below.
 
 ### Reading RONB
@@ -218,7 +217,7 @@ fly apps restart tominari-bot
 ```
 
 Channel IDs live in `config.json`, so `DISCORD_TOKEN` is the only secret that
-actually has to be set. Add `NEWSAPI_KEY`, `SPORTS_API_KEY` or any `RONB_*`
+actually has to be set. Add `NEWSAPI_KEY` or any `RONB_*`
 route the same way.
 
 Two things that will bite if changed: do not add an `[http_service]` block —
@@ -240,9 +239,9 @@ Get-Process node | Stop-Process -Force
 REST — no gateway session, so it is safe to run while the bot is up:
 
 ```bash
-node scripts/postnow.js                    # feed + brief + sports
+node scripts/postnow.js                    # feed + news + brief + sports
 node scripts/postnow.js brief              # one job
-node scripts/postnow.js feed recap health  # any combination
+node scripts/postnow.js feed news health   # any combination
 ```
 
 Useful to seed the channels right after setup instead of waiting for a cron tick.
@@ -250,10 +249,10 @@ Useful to seed the channels right after setup instead of waiting for a cron tick
 ## Testing without Discord
 
 ```bash
-npm run selftest             # 49 offline unit checks
+npm run selftest             # 65 offline unit checks
 npm run selftest -- --network  # also hits the live feeds
 npm run dryrun               # run every scheduled job against a mock client
-npm run dryrun -- brief      # just the morning brief (feed|brief|recap|sports|health)
+npm run dryrun -- brief      # one job (feed|news|brief|recap|sports|health)
 ```
 
 `dryrun` prints exactly what would be posted, to which channel, and sends
@@ -265,10 +264,10 @@ nothing — no token required.
 
 `config.json` holds everything that isn't a secret:
 
-- `schedules` — cron expressions for all six jobs (Nepal time)
+- `schedules` — cron expressions for all seven jobs (Nepal time)
 - `news` — stories per category, summary lengths, max article age
 - `health` — default language/tone, quiet hours, badge milestones
-- `sports` — leagues, teams and their API IDs
+- `sports` — the tracked competitions (ESPN paths, sport, tier) and teams
 - `colors` — per-category embed colours
 
 `data/socialSources.json` is the source list, seeded into SQLite on first run;
@@ -284,22 +283,22 @@ current streak.
 bot.js                 client, interaction router, graceful shutdown
 deploy-commands.js     slash-command registration
 commands/              news, sports, health, social
-schedulers/            six cron jobs (social feed, brief, recap, sports ×2, health)
+schedulers/            seven cron jobs (social feed, category feed, brief, recap,
+                       sports ×2, health)
 scrapers/              RSS, RONB (multi-route), Facebook, Instagram, deduplicator
 services/              newsIngest (fetch → classify → summarise → store),
                        summarizer (article body → extractive summary),
                        publisher (send → record)
 utils/                 database, config, embeds, http, time, text, logger,
                        categoryClassifier (which channel), postClassifier (news vs filler),
-                       sportsApi (API-Football) + sportsDb (TheSportsDB, keyless)
-data/                  sources, categories, quotes, offline sports data, SQLite file
+                       sportsApi + espnSports (ESPN: football, basketball, cricket)
+data/                  sources, categories, quotes, SQLite file
 scripts/               selftest.js, dryrun.js
 ```
 
 Fetching never blocks posting: every source is tried independently, failures are
-logged and the cycle continues with whatever came back. Sports falls back to
-`data/sportsFallback.json`, news falls back to RSS, and reminders work fully
-offline.
+logged and the cycle continues with whatever came back. News falls back to RSS,
+a sport with nothing on simply has no card, and reminders work fully offline.
 
 ## Notes
 

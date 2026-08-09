@@ -5,8 +5,9 @@ require('dotenv').config();
 /**
  * Fire the scheduled jobs immediately, for real — posts land in Discord.
  *
- *   node scripts/postnow.js              # feed + brief + sports
+ *   node scripts/postnow.js              # feed + news + brief + sports
  *   node scripts/postnow.js feed         # only the real-time social feed
+ *   node scripts/postnow.js news         # only the per-category news channels
  *   node scripts/postnow.js brief recap  # any combination
  *
  * Unlike `npm start` this talks to Discord over plain REST instead of opening a
@@ -92,7 +93,7 @@ const client = {
 
 async function main() {
   const requested = process.argv.slice(2).map((a) => a.toLowerCase());
-  const wants = (name) => (requested.length ? requested.includes(name) : ['feed', 'brief', 'sports'].includes(name));
+  const wants = (name) => (requested.length ? requested.includes(name) : ['feed', 'news', 'brief', 'sports'].includes(name));
 
   const missing = [...config.categories, 'social-feed'].filter((c) => !config.channelFor(c));
   if (missing.length) log.warn(`No channel configured for: ${missing.join(', ')} — skipping those.`);
@@ -115,6 +116,17 @@ async function main() {
   if (wants('feed')) {
     const r = await require('../schedulers/realtimeSocialFeed').run(client);
     log.info(`social feed → ${r.posted} posts`);
+    total += r.posted;
+  }
+  // Routes whatever the feed just stored into #politics, #business and the rest.
+  // It must come after `feed`, which is the job that actually polls the sources
+  // — on its own it would have nothing new to route.
+  if (wants('news')) {
+    const r = await require('../schedulers/categoryFeed').run(client, {
+      // On its own there is no feed cycle ahead of it to have filled the table.
+      refresh: !wants('feed'),
+    });
+    log.info(`category feed → ${r.posted} stories across ${r.categories} categories`);
     total += r.posted;
   }
   if (wants('brief')) {

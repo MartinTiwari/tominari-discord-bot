@@ -210,7 +210,7 @@ const newsStatus = {
         `**Posts collected (24h):** ${db.countSocialPosts(24)}`,
         `**Active sources:** ${db.getActiveSources().length} / ${db.getAllSources().length}`,
         `**NewsAPI:** ${require('../utils/newsApi').isConfigured() ? '✅ configured' : '⚪ not configured (RSS only)'}`,
-        `**Sports API:** ${require('../utils/sportsApi').isConfigured() ? '✅ configured' : '⚪ not configured (fallback data)'}`,
+        `**Sports:** ✅ ${require('../utils/sportsApi').sourceName()}`,
         `**Timezone:** ${config.timezone}`,
         '',
         '**Channel wiring:**',

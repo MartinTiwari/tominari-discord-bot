@@ -3,6 +3,7 @@
 const log = require('../utils/logger')('schedulers');
 
 const realtimeSocialFeed = require('./realtimeSocialFeed');
+const categoryFeed = require('./categoryFeed');
 const morningNewsBrief = require('./morningNewsBrief');
 const eveningNewsRecap = require('./eveningNewsRecap');
 const sportsPulse = require('./sportsPulse');
@@ -10,6 +11,9 @@ const healthReminder = require('./healthReminder');
 
 const JOBS = [
   ['realtime social feed', realtimeSocialFeed],
+  // Runs five minutes behind the social feed on purpose: that job does the
+  // fetching, and this one only routes what it stored.
+  ['category news feed', categoryFeed],
   ['morning news brief', morningNewsBrief],
   ['evening news recap', eveningNewsRecap],
   ['sports pulse', sportsPulse],
@@ -61,6 +65,7 @@ module.exports = {
   startAll,
   stopAll,
   realtimeSocialFeed,
+  categoryFeed,
   morningNewsBrief,
   eveningNewsRecap,
   sportsPulse,

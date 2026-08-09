@@ -8,6 +8,7 @@ require('dotenv').config();
  *
  *   node scripts/dryrun.js            # all jobs
  *   node scripts/dryrun.js feed       # only the real-time social feed
+ *   node scripts/dryrun.js news       # only the per-category news channels
  *   node scripts/dryrun.js brief      # only the morning brief
  *   node scripts/dryrun.js recap sports health
  *
@@ -106,6 +107,12 @@ async function main() {
     console.log('\n══════ Real-time social feed ══════');
     const r = await require('../schedulers/realtimeSocialFeed').run(mockClient);
     console.log(`\n→ would post ${r.posted} items`);
+  }
+
+  if (wants('news')) {
+    console.log('\n══════ Per-category news feed (every 30 min) ══════');
+    const r = await require('../schedulers/categoryFeed').run(mockClient);
+    console.log(`\n→ would post ${r.posted} stories across ${r.categories} categories`);
   }
 
   if (wants('brief')) {

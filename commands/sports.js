@@ -6,16 +6,17 @@ const sportsApi = require('../utils/sportsApi');
 const embeds = require('../utils/embedFormatter');
 const config = require('../utils/config');
 
-// Discord allows at most 25 choices per option and we track more competitions
-// than that, so the picker shows the biggest ones — `resolveLeague` still
-// accepts anything typed by hand, including team names.
-const LEAGUE_CHOICES = Object.entries(config.sports.leagues)
-  .sort(([, a], [, b]) => (a.tier ?? 2) - (b.tier ?? 2) || a.name.localeCompare(b.name))
+// Discord allows at most 25 choices per option — `resolveLeague` still accepts
+// anything typed by hand, including team names.
+const LEAGUE_CHOICES = sportsApi.trackedLeagues()
   .slice(0, 25)
-  .map(([value, l]) => ({ name: `${l.emoji} ${l.name}`, value }));
+  .map((l) => ({ name: `${l.emoji} ${l.name}`, value: l.key }));
 
 const TEAM_CHOICES = Object.entries(config.sports.teams)
   .map(([value, t]) => ({ name: t.name, value }));
+
+const SPORT_CHOICES = sportsApi.trackedSports()
+  .map((s) => ({ name: `${s.emoji} ${s.label}`, value: s.key }));
 
 const standings = {
   data: new SlashCommandBuilder()
@@ -33,17 +34,19 @@ const standings = {
 
     if (!league) {
       return interaction.editReply({
-        embeds: [embeds.errorEmbed('Unknown league', `I don't track \`${input}\`. Try premier, laliga, bundesliga, seriea, ligue1 or ucl.`)],
+        embeds: [embeds.errorEmbed('Unknown competition', `I don't track \`${input}\`. Try premier, laliga, bundesliga, seriea, ligue1, ucl or nba.`)],
       });
     }
 
-    const { data, note } = await sportsApi.getStandings(league.key);
+    const { data, note, format, grouped } = await sportsApi.getStandings(league.key);
     if (!data.length) {
       return interaction.editReply({ embeds: [embeds.errorEmbed('No standings', note || 'No data available.')] });
     }
 
     await interaction.editReply({
-      embeds: [embeds.standingsEmbed(league.name, data, { emoji: league.emoji, note })],
+      embeds: [embeds.standingsEmbed(league.name, data, {
+        emoji: league.emoji, note, format, grouped,
+      })],
     });
   },
 };
@@ -100,7 +103,7 @@ const addFavorite = {
       });
     }
 
-    const added = db.addFavorite(interaction.user.id, team.key, team.name, team.league);
+    const added = db.addFavorite(interaction.user.id, team.key, team.name, team.competition);
     await interaction.reply({
       content: added
         ? `⭐ Added **${team.name}** to your favourites.`
@@ -143,7 +146,7 @@ const myFavorites = {
     }
 
     const lines = rows.map((f) => {
-      const league = config.sports.leagues[f.league];
+      const league = sportsApi.resolveLeague(f.league);
       return `⭐ **${f.team_name}** ${league ? `— ${league.emoji} ${league.name}` : ''}`;
     });
     await interaction.reply({
@@ -167,13 +170,7 @@ const today = {
     const results = await Promise.all(teams.map((t) => sportsApi.getTodayFixtures(t)));
     const fixtures = results.flatMap((r) => r.data);
 
-    if (!fixtures.length) {
-      return interaction.editReply(
-        sportsApi.isConfigured()
-          ? '📭 No matches today for your teams.'
-          : '⚠️ Live fixtures need `SPORTS_API_KEY` in `.env` (API-Football via RapidAPI).',
-      );
-    }
+    if (!fixtures.length) return interaction.editReply('📭 No matches today for your teams.');
 
     const lines = fixtures.map((f) => {
       const score = f.score && f.score !== '- : -' ? ` — **${f.score}**` : '';
@@ -186,28 +183,27 @@ const today = {
 const live = {
   data: new SlashCommandBuilder()
     .setName('live')
-    .setDescription('Live scores from the top leagues right now')
-    .addBooleanOption((o) => o
-      .setName('worldwide')
-      .setDescription('Include every competition, not just the tracked ones')
-      .setRequired(false)),
+    .setDescription('Live scores from the big competitions right now')
+    .addStringOption((o) => o
+      .setName('sport')
+      .setDescription('Narrow it to one sport')
+      .setRequired(false)
+      .addChoices(...SPORT_CHOICES)),
   async execute(interaction) {
     await interaction.deferReply();
-    const all = interaction.options.getBoolean('worldwide') ?? false;
-    const { data, note, totalWorldwide } = await sportsApi.getLiveMatches({ all });
+    const sport = interaction.options.getString('sport');
+    const { data, note, totalToday } = await sportsApi.getLiveMatches({ sport });
 
     if (!data.length) {
-      const extra = totalWorldwide
-        ? ` ${totalWorldwide} match${totalWorldwide === 1 ? ' is' : 'es are'} live elsewhere — try \`/live worldwide:true\`.`
+      const extra = totalToday
+        ? ` ${totalToday} ${totalToday === 1 ? 'match is' : 'matches are'} on today's card — try \`/matches\`.`
         : '';
-      return interaction.editReply(`📭 Nothing in play in the tracked competitions right now.${extra}`);
+      return interaction.editReply(`📭 Nothing in play right now.${extra}`);
     }
 
+    const label = sport ? ` — ${SPORT_CHOICES.find((c) => c.value === sport)?.name}` : '';
     await interaction.editReply({
-      embeds: [embeds.liveScoreEmbed(data.slice(0, 20), {
-        note,
-        title: all ? '🔴 Live now — worldwide' : '🔴 Live now',
-      })],
+      embeds: [embeds.liveScoreEmbed(data.slice(0, 20), { note, title: `🔴 Live now${label}` })],
     });
   },
 };
@@ -215,14 +211,20 @@ const live = {
 const matches = {
   data: new SlashCommandBuilder()
     .setName('matches')
-    .setDescription("Today's card across the top leagues")
+    .setDescription("Today's card across the big competitions")
     .addStringOption((o) => o
       .setName('date')
       .setDescription('YYYY-MM-DD (defaults to today)')
-      .setRequired(false)),
+      .setRequired(false))
+    .addStringOption((o) => o
+      .setName('sport')
+      .setDescription('Narrow it to one sport')
+      .setRequired(false)
+      .addChoices(...SPORT_CHOICES)),
   async execute(interaction) {
     await interaction.deferReply();
     const date = interaction.options.getString('date');
+    const sport = interaction.options.getString('sport');
 
     if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return interaction.editReply({
@@ -230,15 +232,15 @@ const matches = {
       });
     }
 
-    const { data, note, partial } = await sportsApi.getMatchesForDate(date);
+    const { data, note } = await sportsApi.getMatchesForDate(date, { sport });
     if (!data.length) {
       return interaction.editReply(`📭 No matches in the tracked competitions${date ? ` on ${date}` : ' today'}.`);
     }
 
     await interaction.editReply({
       embeds: [embeds.matchdayEmbed(data, {
-        title: date ? `⚽ Matches on ${date}` : "⚽ Today's matches",
-        note: partial ? `${note} — add SPORTS_API_KEY for the full worldwide card` : note,
+        title: date ? `🏟️ Matches on ${date}` : "🏟️ Today's matches",
+        note,
       })],
     });
   },

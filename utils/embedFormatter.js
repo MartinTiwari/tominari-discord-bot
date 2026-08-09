@@ -174,20 +174,65 @@ function motivationEmbed({ message, days, tone }) {
 }
 
 /** League table. `rows` are already sorted by position. */
-function standingsEmbed(leagueName, rows, { emoji = '⚽', note = null } = {}) {
-  const lines = rows.slice(0, 20).map((r) => {
-    const pos = String(r.position).padStart(2, ' ');
+/**
+ * League table.
+ *
+ * Two shapes, because two families of sport count differently: `soccer` prints
+ * played / goal difference / points, `record` prints win–loss / percentage /
+ * games behind. Leagues that split into conferences arrive already tagged with
+ * a group name and get one field each, so the East and the West are not
+ * interleaved into one nonsensical ladder.
+ */
+function standingsEmbed(leagueName, rows, {
+  emoji = '⚽', note = null, format = 'soccer', grouped = false,
+} = {}) {
+  const record = format === 'record';
+  const heading = record
+    ? ' #  TEAM               W-L    PCT   GB'
+    : ' #  TEAM                P  GD  PTS';
+
+  const line = (r, i) => {
+    const pos = String(r.position || i + 1).padStart(2, ' ');
     const name = truncate(r.team, 18).padEnd(18, ' ');
-    return `\`${pos} ${name} ${String(r.played).padStart(2)} ${String(r.goalDiff > 0 ? `+${r.goalDiff}` : r.goalDiff).padStart(3)} ${String(r.points).padStart(3)}\``;
-  });
+    if (record) {
+      return `\`${pos} ${name} ${r.record.padStart(5)} ${String(r.percent).padStart(5)} ${String(r.gamesBehind).padStart(4)}\``;
+    }
+    const gd = r.goalDiff > 0 ? `+${r.goalDiff}` : String(r.goalDiff);
+    return `\`${pos} ${name} ${String(r.played).padStart(2)} ${gd.padStart(3)} ${String(r.points).padStart(3)}\``;
+  };
 
   const embed = new EmbedBuilder()
     .setColor(config.colorFor('sports'))
     .setTitle(`${emoji} ${leagueName} — Standings`)
-    .setDescription(
-      `\`\`\`\n #  TEAM                P  GD  PTS\n\`\`\`\n${lines.join('\n') || '_No data._'}`,
-    )
     .setTimestamp();
+
+  if (!rows.length) {
+    embed.setDescription('_No table published yet._');
+    if (note) embed.setFooter({ text: note });
+    return embed;
+  }
+
+  const header = `\`\`\`\n${heading}\n\`\`\``;
+
+  if (grouped) {
+    embed.setDescription(header);
+    const groups = new Map();
+    for (const r of rows) {
+      const key = r.group || 'Table';
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(r);
+    }
+    // Discord caps a field at 1024 characters, so each conference shows the
+    // teams that would actually make the playoffs rather than all fifteen.
+    for (const [name, group] of [...groups].slice(0, 4)) {
+      embed.addFields({
+        name,
+        value: truncate(group.slice(0, 10).map(line).join('\n'), 1000),
+      });
+    }
+  } else {
+    embed.setDescription(`${header}\n${rows.slice(0, 20).map(line).join('\n')}`);
+  }
 
   if (note) embed.setFooter({ text: note });
   return embed;
@@ -253,6 +298,20 @@ function scoreLine(m) {
   return m.score ? `**${home}  ${m.score}  ${away}**` : `${home} vs ${away}`;
 }
 
+/**
+ * What to print after the scoreline: the clock while it is being played, the
+ * local start time before, and afterwards the result.
+ *
+ * Cricket is the reason this is not just `FT`: a finished match reads
+ * "won by 71 runs", which says more than any scoreline, whereas football has
+ * already said everything in the two numbers.
+ */
+function outcomeMarker(m) {
+  if (m.state === 'live') return m.minute ? `\`${m.minute}\`` : '`LIVE`';
+  if (m.state !== 'finished') return `🕐 ${kickoffTime(m)}`;
+  return m.sport === 'cricket' && m.status ? `— _${truncate(m.status, 60)}_` : '`FT`';
+}
+
 /** Group matches by competition, preserving the order they arrived in. */
 function groupByCompetition(matches) {
   const groups = new Map();
@@ -310,12 +369,7 @@ function matchdayEmbed(matches, { title = "⚽ Today's matches", note = null, pe
 
   // Discord allows 25 fields; one per competition keeps us far inside that.
   for (const [label, group] of [...groupByCompetition(matches)].slice(0, 20)) {
-    const lines = group.slice(0, perCompetition).map((m) => {
-      const when = m.state === 'live'
-        ? (m.minute ? `\`${m.minute}\`` : '`LIVE`')
-        : (m.state === 'finished' ? '`FT`' : `🕐 ${kickoffTime(m)}`);
-      return `${scoreLine(m)} ${when}`;
-    });
+    const lines = group.slice(0, perCompetition).map((m) => `${scoreLine(m)} ${outcomeMarker(m)}`);
     if (group.length > perCompetition) lines.push(`_+${group.length - perCompetition} more_`);
     embed.addFields({ name: label, value: truncate(lines.join('\n'), 1000) });
   }

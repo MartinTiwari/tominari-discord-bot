@@ -22,16 +22,16 @@ name: Tominari
 # timers.
 on:
   schedule:
-    - cron: '*/30 * * * *'   # social feed + churot-free blast
+    - cron: '*/30 * * * *'   # social feed + per-category news + churot-free blast
     - cron: '15 0 * * *'     # morning brief
     - cron: '15 16 * * *'    # evening recap
     - cron: '15 3,13 * * *'  # sports pulse
   workflow_dispatch:         # lets you fire a run by hand from the Actions tab
     inputs:
       jobs:
-        description: 'Space-separated: feed brief recap sports health'
+        description: 'Space-separated: feed news brief recap sports health'
         required: false
-        default: 'feed health'
+        default: 'feed news health'
 
 # Runs share one SQLite cache, so never let two overlap.
 concurrency:
@@ -76,7 +76,10 @@ jobs:
               '15 0 * * *')    echo "jobs=brief"       >> "$GITHUB_OUTPUT" ;;
               '15 16 * * *')   echo "jobs=recap"       >> "$GITHUB_OUTPUT" ;;
               '15 3,13 * * *') echo "jobs=sports"      >> "$GITHUB_OUTPUT" ;;
-              *)               echo "jobs=feed health" >> "$GITHUB_OUTPUT" ;;
+              # The half-hourly tick. `news` routes what `feed` just collected
+              # into #politics, #business and the rest — without it those
+              # channels only ever heard from the daily brief and recap.
+              *)               echo "jobs=feed news health" >> "$GITHUB_OUTPUT" ;;
             esac
           fi
 
@@ -84,9 +87,8 @@ jobs:
         env:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
-          # Optional: sports are live without a key via TheSportsDB.
-          SPORTS_API_KEY: ${{ secrets.SPORTS_API_KEY }}
-          SPORTSDB_KEY: ${{ secrets.SPORTSDB_KEY }}
+          # Sports needs no key at all — ESPN's public API serves the football,
+          # basketball and cricket boards.
           # RONB routes. All optional — unset ones are simply skipped, and the
           # feed falls back to the newspaper sources. See .env.example.
           RONB_FB_FEED: ${{ secrets.RONB_FB_FEED }}

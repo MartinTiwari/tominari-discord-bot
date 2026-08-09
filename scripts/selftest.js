@@ -172,6 +172,30 @@ async function main() {
     return 'user toggle survives restart';
   });
 
+  check('every configured channel has a job that posts to it', () => {
+    // The bug this locks down: #social-feed filled up all day while #politics,
+    // #business, #tech, #entertainment and #world sat empty, because the only
+    // jobs that wrote to them were the 6 AM brief and the 10 PM recap — and on
+    // a half-hourly runner those two fire once each. The category feed now
+    // routes stories as they arrive, so this asserts the wiring end to end.
+    const fs = require('fs');
+    const path = require('path');
+    const read = (p) => fs.readFileSync(path.join(__dirname, '..', p), 'utf8');
+
+    assert(read('schedulers/index.js').includes("require('./categoryFeed')"),
+      'the long-running bot no longer starts the category feed');
+    assert(read('scripts/postnow.js').includes("require('../schedulers/categoryFeed')"),
+      'postnow.js no longer runs the category feed — CI would post only the social feed');
+
+    // GitHub Actions owns the schedule, so the half-hourly tick is what matters.
+    const workflow = read('.github/workflows/tominari.yml');
+    const tick = workflow.match(/jobs=(feed[^"]*)"\s*>>\s*"\$GITHUB_OUTPUT"\s*;;\s*$/m);
+    assert(tick && tick[1].split(/\s+/).includes('news'),
+      `the half-hourly workflow tick runs "${tick?.[1] ?? '?'}" — without "news" only #social-feed is fed`);
+
+    return `half-hourly tick runs: ${tick[1]}`;
+  });
+
   check('postnow seeds sources and leaves ingestion to the jobs', () => {
     // Two bugs this locks down, both of which exited 0 and looked healthy:
     //
@@ -501,12 +525,26 @@ async function main() {
     assert(json.description.includes('32'), 'day count missing');
     return 'ok';
   });
-  check('standings embed builds', () => {
-    const rows = require('../data/sportsFallback.json').standings.bundesliga;
-    const json = embeds.standingsEmbed('Bundesliga', rows, { emoji: '🇩🇪' }).toJSON();
-    assert(json.description.length <= 4096, 'description too long');
-    assert(json.description.includes('Bayern'), 'Bayern missing from table');
-    return `${rows.length} rows`;
+  check('standings embed builds in both formats', () => {
+    const table = [
+      { position: 1, team: 'Bayern Munich', played: 34, goalDiff: 54, points: 82 },
+      { position: 2, team: 'Bayer Leverkusen', played: 34, goalDiff: -3, points: 69 },
+    ];
+    const soccer = embeds.standingsEmbed('Bundesliga', table, { emoji: '🇩🇪' }).toJSON();
+    assert(soccer.description.length <= 4096, 'description too long');
+    assert(soccer.description.includes('Bayern'), 'Bayern missing from table');
+    assert(soccer.description.includes('+54'), 'positive goal difference lost its sign');
+
+    // Basketball counts wins and losses, not goals, and splits by conference.
+    const record = [
+      { group: 'Eastern Conference', position: 1, team: 'Pistons', played: 82, won: 60, lost: 22, record: '60-22', percent: '.732', gamesBehind: '-' },
+      { group: 'Western Conference', position: 1, team: 'Thunder', played: 82, won: 68, lost: 14, record: '68-14', percent: '.829', gamesBehind: '-' },
+    ];
+    const nba = embeds.standingsEmbed('NBA', record, { emoji: '🏀', format: 'record', grouped: true }).toJSON();
+    const fields = nba.fields || [];
+    assert(fields.length === 2, `expected one field per conference, got ${fields.length}`);
+    assert(fields[0].value.includes('60-22'), 'win-loss record missing');
+    return 'both formats';
   });
   check('error embed builds', () => {
     assert(embeds.errorEmbed('Title', 'Detail').toJSON().title.includes('Title'), 'title missing');
@@ -529,16 +567,23 @@ async function main() {
     assert(sportsApi.resolveLeague('bayern')?.key === 'bundesliga', 'team → league failed');
     return 'ok';
   });
-  await checkAsync('standings always return a usable table', async () => {
-    // Live data no longer depends on SPORTS_API_KEY: TheSportsDB serves the
-    // table without one, and the bundled snapshot is the last resort.
-    const { data, live, note } = await sportsApi.getStandings('bundesliga');
-    assert(data.length > 0, 'no rows returned by any provider');
+  await checkAsync('standings return a full table, not a truncated one', async () => {
+    // The reason for moving off TheSportsDB: its keyless tier cut every table
+    // to five rows, so this asserts a real division's worth of teams.
+    const { data, live, note, format } = await sportsApi.getStandings('premier');
+    assert(data.length >= 18, `only ${data.length} rows — that looks truncated`);
     assert(data.every((r) => r.team && Number.isFinite(r.points)),
       'a row is missing a team name or points');
     assert(typeof note === 'string' && note.length > 0, 'no provenance note');
-    assert(live || /snapshot/i.test(note), 'stale data was not labelled as a snapshot');
+    assert(format === 'soccer', `expected a points table, got "${format}"`);
     return `${data.length} rows, live=${live}`;
+  });
+
+  await checkAsync('basketball tables come back in win-loss form', async () => {
+    const { data, format } = await sportsApi.getStandings('nba');
+    assert(format === 'record', `expected a win-loss table, got "${format}"`);
+    assert(data.every((r) => typeof r.record === 'string'), 'a row has no win-loss record');
+    return `${data.length} teams`;
   });
 
   await checkAsync('fixtures come back without an API key', async () => {
@@ -554,13 +599,19 @@ async function main() {
     assert(leagues.length >= 20, `only ${leagues.length} competitions tracked`);
     for (const l of leagues) {
       assert(l.name && l.emoji, `${l.key} is missing a name or emoji`);
-      assert(Number.isInteger(l.apiId), `${l.key} has no API-Football id`);
-      assert([1, 2].includes(l.tier), `${l.key} has tier ${l.tier}`);
+      assert(/^[a-z]+\/[a-z0-9.]+$/i.test(l.path || ''), `${l.key} has no ESPN path`);
+      assert([0, 1, 2].includes(l.tier), `${l.key} has tier ${l.tier}`);
+      assert(sportsApi.trackedSports().some((s) => s.key === l.sport),
+        `${l.key} is in an unknown sport "${l.sport}"`);
     }
-    // Choices are capped at 25 per option, and registration fails past that.
-    const ids = leagues.map((l) => l.apiId);
-    assert(new Set(ids).size === ids.length, 'two competitions share an apiId');
-    return `${leagues.length} competitions, ${sportsApi.trackedLeagues({ maxTier: 1 }).length} elite`;
+    const paths = leagues.map((l) => l.path);
+    assert(new Set(paths).size === paths.length, 'two competitions share an ESPN path');
+
+    const sports = new Set(leagues.map((l) => l.sport));
+    for (const want of ['soccer', 'basketball', 'cricket']) {
+      assert(sports.has(want), `no ${want} competitions are tracked`);
+    }
+    return `${leagues.length} competitions across ${sports.size} sports`;
   });
 
   check('the league picker stays inside Discord\'s 25-choice limit', () => {
@@ -577,15 +628,15 @@ async function main() {
   await checkAsync('live scoreboard returns a renderable shape', async () => {
     // Whether anything is in play depends on the hour, so this asserts the
     // contract rather than a match count.
-    const { data, totalWorldwide } = await sportsApi.getLiveMatches();
+    const { data, totalToday } = await sportsApi.getLiveMatches();
     assert(Array.isArray(data), 'data is not an array');
     assert(data.every((m) => m.home && m.away), 'a live match is missing a team');
     assert(data.every((m) => typeof m.score === 'string'), 'a live match has no score');
     assert(data.every((m) => m.leagueKey), 'an untracked competition leaked through the filter');
     embeds.liveScoreEmbed(data, { note: 'selftest' });
     return data.length
-      ? `${data.length} live in tracked leagues (${totalWorldwide} worldwide)`
-      : `none in tracked leagues right now (${totalWorldwide} worldwide)`;
+      ? `${data.length} live of ${totalToday} on today's card`
+      : `nothing in play right now (${totalToday} on today's card)`;
   });
 
   await checkAsync('the day\'s card builds an embed inside Discord\'s limits', async () => {
