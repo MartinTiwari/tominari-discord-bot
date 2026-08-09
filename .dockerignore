@@ -21,3 +21,7 @@ scripts/run-forever.ps1
 *.md
 tominari_design.md
 tominari_nepali_quotes.json
+
+# Fly.io machine state.
+fly.toml.bak
+.fly

@@ -185,9 +185,54 @@ It runs as your user at logon rather than as a service, because a service that
 starts before login needs your account password stored in Task Scheduler. The
 practical limit: **the bot is up only while the machine is on and you're logged
 in.** Sleep-on-AC is already disabled, so a plugged-in desktop is effectively
-always-on; a laptop that sleeps or shuts down is not. For genuine 24/7,
-deploy to a host (Railway, Fly, a VPS) — the code needs no changes, just the
-same `.env`.
+always-on; a laptop that sleeps or shuts down is not.
+
+### Why it can show offline even when the process is running
+
+`discord.js` reconnects on its own, but a shard can end up permanently stuck —
+an unresumable session, or a half-open socket. The process stays alive, every
+cron keeps firing into the void, and nothing restarts it because nothing
+crashed. So `bot.js` runs a watchdog: if the gateway has not been READY for
+`GATEWAY_GRACE_MS` (default 5 minutes) it exits non-zero and lets the
+supervisor start a clean process. Presence is also re-applied on
+`ShardResume`, since a resumed session otherwise leaves the bot connected and
+working but greyed out in the member list.
+
+### Deploying to Fly.io
+
+For real 24/7 the bot has to live off your PC. `fly.toml` is set up for it —
+a worker with no HTTP port, one machine, and a volume so the SQLite database
+survives redeploys.
+
+```bash
+# One-time: install flyctl, then sign in (opens a browser)
+fly auth login
+
+fly launch --no-deploy --copy-config          # claims the app name
+fly volumes create tominari_data --size 1 --region sin
+fly secrets set DISCORD_TOKEN=... DISCORD_CLIENT_ID=... DISCORD_GUILD_ID=...
+fly deploy
+
+fly logs                                       # follow it
+fly apps restart tominari-bot
+```
+
+Channel IDs live in `config.json`, so `DISCORD_TOKEN` is the only secret that
+actually has to be set. Add `NEWSAPI_KEY`, `SPORTS_API_KEY` or any `RONB_*`
+route the same way.
+
+Two things that will bite if changed: do not add an `[http_service]` block —
+Fly would health-check a port the bot never opens and kill the machine on a
+loop — and do not scale past one machine, because each instance runs its own
+cron and they share no lock, so every brief would post twice.
+
+Once Fly is live, stop the local copy or it will double-post:
+
+```powershell
+Stop-ScheduledTask -TaskName "Tominari Bot"
+Disable-ScheduledTask -TaskName "Tominari Bot"
+Get-Process node | Stop-Process -Force
+```
 
 ### Posting on demand
 

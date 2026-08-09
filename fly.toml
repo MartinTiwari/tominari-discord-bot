@@ -1,0 +1,52 @@
+# Fly.io deployment for Tominari.
+#
+# This is a worker, not a web service: it opens a WebSocket to Discord and
+# never listens on a port. That is why there is no [http_service] block — with
+# one, Fly would health-check an HTTP port that does not exist and keep killing
+# the machine. It also means the machine must never auto-stop, since a stopped
+# bot shows offline.
+#
+# Deploy:
+#   fly launch --no-deploy --copy-config   # first time only, claims the app name
+#   fly secrets set DISCORD_TOKEN=... DISCORD_CLIENT_ID=... DISCORD_GUILD_ID=...
+#   fly volumes create tominari_data --size 1 --region sin
+#   fly deploy
+#
+# Watch it:  fly logs        Restart it:  fly apps restart tominari-bot
+
+app = "tominari-bot"
+
+# Singapore is Fly's closest region to Nepal — it only affects how quickly the
+# bot reaches Discord and the news sites, not which timezone it posts in.
+primary_region = "sin"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  # Cron schedules are all Asia/Kathmandu, so the container clock must match.
+  TZ = "Asia/Kathmandu"
+  # Points SQLite at the mounted volume below, so streaks and dedupe state
+  # survive every redeploy. Without this the database lives in the image and is
+  # wiped on each deploy — the churot-free streak would reset every time.
+  DB_PATH = "/data/tominari.db"
+  NODE_ENV = "production"
+
+[mounts]
+  source = "tominari_data"
+  destination = "/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+  cpus = 1
+
+# One machine only. A second would double-post every scheduled brief, since
+# each instance runs its own cron and they share no lock.
+[deploy]
+  strategy = "immediate"
+
+[experimental]
+  # Fly restarts a machine whose process exits, which is exactly what the
+  # gateway watchdog in bot.js relies on to recover from a stuck connection.
+  auto_rollback = true
